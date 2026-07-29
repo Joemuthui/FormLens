@@ -913,13 +913,17 @@ function showKeyInput(){
 }
 
 async function verifyKey(key){
-  // Make a minimal API call to verify the key works
   const r=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
     body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'Hi'}]})
   });
-  return r.ok||(r.status===400); // 400 = request invalid but key accepted
+  return r.ok||(r.status===400);
 }
 
 async function saveApiKey(){
@@ -1015,7 +1019,12 @@ async function claude(messages,sys,maxTok,retries){
   if(!maxTok)maxTok=2000;if(retries===undefined)retries=2;
   const key=getApiKey();
   if(!key)throw new Error('No API key configured. Please add your Anthropic API key on the home screen.');
-  const headers={'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'};
+  const headers={
+    'Content-Type':'application/json',
+    'x-api-key':key,
+    'anthropic-version':'2023-06-01',
+    'anthropic-dangerous-direct-browser-access':'true'
+  };
   for(let a=0;a<=retries;a++){
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTok,system:sys,messages})});
     if(r.status===529||r.status===429){if(a<retries){await new Promise(function(x){setTimeout(x,2000*(a+1));});continue;}}
