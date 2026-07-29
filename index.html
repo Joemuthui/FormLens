@@ -921,7 +921,7 @@ async function verifyKey(key){
       'anthropic-version':'2023-06-01',
       'anthropic-dangerous-direct-browser-access':'true'
     },
-    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'Hi'}]})
+    body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:10,messages:[{role:'user',content:'Hi'}]})
   });
   return r.ok||(r.status===400);
 }
@@ -1026,7 +1026,7 @@ async function claude(messages,sys,maxTok,retries){
     'anthropic-dangerous-direct-browser-access':'true'
   };
   for(let a=0;a<=retries;a++){
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTok,system:sys,messages})});
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:maxTok,system:sys,messages})});
     if(r.status===529||r.status===429){if(a<retries){await new Promise(function(x){setTimeout(x,2000*(a+1));});continue;}}
     if(r.status===401){throw new Error('Invalid API key. Please update your key on the home screen.');}
     if(!r.ok){const e=await r.json().catch(function(){return{};});throw new Error((e.error&&e.error.message)||'HTTP '+r.status);}
