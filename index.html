@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FormLens</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1c1b18;--ink2:#4a4840;--ink3:#8a877e;--ink4:#b8b4aa;
+  --paper:#faf9f6;--paper2:#f2f0ea;--paper3:#e8e4db;
+  --border:rgba(28,27,24,0.10);--border2:rgba(28,27,24,0.18);--border3:rgba(28,27,24,0.28);
+  --pine:#1a5c3a;--pine-mid:#2e7d52;--pine-light:#e6f2ec;--pine-pale:#f0f8f4;
+  --amber:#b45309;--amber-light:#fef3e2;
+  --crimson:#b91c1c;--crim-light:#fef2f2;
+  --sky:#1d4ed8;--sky-light:#eff6ff;
+  --r:8px;--rl:12px;--rxl:16px;
+  --ff-d:'DM Serif Display',Georgia,serif;
+  --ff-b:'Instrument Sans',system-ui,sans-serif;
+  --ff-m:'DM Mono','Courier New',monospace;
+  --sh-md:0 4px 12px rgba(0,0,0,0.08);--sh-lg:0 12px 32px rgba(0,0,0,0.12);
+}
+html{font-size:14px}
+body{font-family:var(--ff-b);background:var(--paper);color:var(--ink);line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:var(--paper3);border-radius:3px}
+.muted{color:var(--ink3);font-style:italic}
+/* topbar */
+.app-shell{display:flex;flex-direction:column;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:100}
+.topbar-brand{display:flex;align-items:center;gap:9px;font-family:var(--ff-d);font-size:20px;color:#fff;background:none;border:none;cursor:pointer;padding:0;transition:opacity .15s}
+.topbar-brand:hover{opacity:.78}
+.brand-dot{width:8px;height:8px;background:var(--pine-mid);border-radius:50%}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.stor-ind{display:flex;align-items:center;gap:6px;font-family:var(--ff-m);font-size:10px;color:rgba(255,255,255,.4)}
+.stor-dot{width:6px;height:6px;border-radius:50%;background:var(--ink4);transition:background .3s}
+.stor-dot.saved{background:var(--pine-mid)}
+.stor-dot.saving{background:var(--amber);animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* breadcrumb */
+.breadcrumb{display:flex;align-items:center;gap:6px}
+.bc-step{font-size:11px;color:rgba(255,255,255,.3);display:flex;align-items:center;gap:5px;transition:color .2s}
+.bc-step.active{color:#fff}.bc-step.done{color:rgba(255,255,255,.5);cursor:pointer}.bc-step.done:hover{color:#fff}
+.bc-arr{color:rgba(255,255,255,.2);font-size:10px}
+.bc-num{width:18px;height:18px;border-radius:50%;border:1px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+.bc-step.active .bc-num{background:var(--pine-mid);border-color:var(--pine-mid);color:#fff}
+.bc-step.done .bc-num{background:rgba(255,255,255,.12);border-color:transparent}
+/* screens */
+.screen{display:none;flex:1;flex-direction:column}.screen.active{display:flex}
+/* toast */
+.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--ink);color:#fff;font-family:var(--ff-b);font-size:12px;padding:10px 16px;border-radius:var(--r);box-shadow:var(--sh-md);display:flex;align-items:center;gap:8px;animation:tin .25s ease;pointer-events:auto;max-width:320px}
+.toast.ok{background:var(--pine)}.toast.warn{background:var(--amber)}.toast.err{background:var(--crimson)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* safeConfirm */
+.sc-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.sc-box{background:var(--paper);border:1px solid var(--border2);border-radius:var(--rl);padding:24px 28px;max-width:400px;width:100%;box-shadow:var(--sh-lg)}
+.sc-msg{font-size:13px;margin-bottom:18px;line-height:1.55}
+.sc-btns{display:flex;justify-content:flex-end;gap:8px}
+/* landing */
+#screen-landing{align-items:center;justify-content:center;padding:52px 0}
+#resume-sec{width:100%}
+.land-wrap{max-width:720px;width:100%;padding:0 32px;display:flex;flex-direction:column;align-items:center}
+.land-inner{text-align:center;width:100%}
+.land-eye{font-family:var(--ff-m);font-size:11px;color:var(--pine);letter-spacing:.08em;margin-bottom:18px}
+.land-h{font-family:var(--ff-d);font-size:44px;line-height:1.1;margin-bottom:14px}
+.land-h em{color:var(--pine);font-style:italic}
+.land-sub{font-size:15px;color:var(--ink2);max-width:500px;margin:0 auto 32px;line-height:1.7}
+
+/* resume card */
+.res-card{background:var(--pine-pale);border:1.5px solid rgba(26,92,58,.25);border-radius:var(--rxl);padding:22px 24px;text-align:left;cursor:pointer;transition:all .2s;margin-bottom:20px;display:flex;align-items:center;gap:16px;width:100%}
+.res-card:hover{border-color:var(--pine);box-shadow:var(--sh-md);transform:translateY(-1px)}
+.rc-icon{font-size:28px;flex-shrink:0}
+.rc-title{font-family:var(--ff-d);font-size:17px;color:var(--pine);margin-bottom:4px}
+.rc-meta{font-size:12px;color:var(--ink2)}
+.rc-badge{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:6px 16px;border-radius:6px;background:var(--pine);color:#fff;margin-left:auto;flex-shrink:0}
+/* landing cards */
+.land-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:28px;width:100%}
+.lcard{background:var(--paper);border:1.5px solid var(--border2);border-radius:var(--rxl);padding:24px 20px;cursor:pointer;text-align:left;transition:all .2s}
+.lcard:hover{border-color:var(--pine);transform:translateY(-2px);box-shadow:var(--sh-md)}
+.lc-icon{font-size:24px;margin-bottom:11px}
+.lc-title{font-family:var(--ff-d);font-size:16px;margin-bottom:5px}
+.lc-desc{font-size:12px;color:var(--ink2);line-height:1.6}
+.lc-tag{display:inline-block;margin-top:11px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:4px;background:var(--pine-light);color:var(--pine)}
+.lc-tag.amb{background:var(--amber-light);color:var(--amber)}
+.land-div{font-size:11px;color:var(--ink4);margin:20px 0 14px;text-align:center}
+.prof-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%}
+.pchip{display:flex;align-items:center;gap:7px;background:var(--paper2);border:1px solid var(--border2);border-radius:20px;padding:6px 13px;font-size:12px;cursor:pointer;transition:all .15s}
+.pchip:hover{background:var(--pine-light);border-color:var(--pine);color:var(--pine)}
+.pchip-del{color:var(--ink4);font-size:12px;margin-left:4px;background:none;border:none;cursor:pointer;padding:0}
+.pchip-del:hover{color:var(--crimson)}
+/* discovery */
+#screen-discovery{align-items:center;justify-content:flex-start;padding:40px 24px}
+.disc-inner{max-width:600px;width:100%}
+.disc-hdr{margin-bottom:26px}
+.disc-hdr h2{font-family:var(--ff-d);font-size:26px;margin-bottom:5px}
+.disc-hdr p{font-size:13px;color:var(--ink2);line-height:1.65}
+.dz-lg{border:2px dashed var(--border3);border-radius:var(--rxl);padding:42px 28px;text-align:center;cursor:pointer;transition:all .2s;background:var(--paper2);margin-bottom:18px}
+.dz-lg:hover,.dz-lg.drag{background:var(--pine-pale);border-color:var(--pine)}
+.dz-ico{font-size:36px;margin-bottom:9px}
+.dz-ttl{font-family:var(--ff-d);font-size:17px;margin-bottom:4px}
+.dz-sub{font-size:12px;color:var(--ink3)}
+.dz-pill{display:inline-flex;align-items:center;gap:7px;background:var(--pine-light);border:1px solid rgba(26,92,58,.2);border-radius:20px;padding:5px 13px;font-size:12px;color:var(--pine);margin-top:9px}
+/* refinement */
+#screen-refinement{padding:0;overflow:hidden}
+.ref-layout{display:grid;grid-template-columns:1fr 340px;height:calc(100vh - 54px)}
+.ref-main{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.ref-mhdr{display:flex;align-items:center;justify-content:space-between;padding:13px 17px;border-bottom:1px solid var(--border);background:var(--paper);flex-shrink:0}
+.ref-mhdr h3{font-family:var(--ff-d);font-size:17px}
+.hdr-acts{display:flex;align-items:center;gap:8px}
+.sch-wrap{flex:1;overflow:auto}
+.sch-tbl{width:100%;border-collapse:collapse;font-family:var(--ff-b);font-size:12px}
+.sch-tbl thead th{background:var(--paper2);font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);padding:8px 9px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap;position:sticky;top:0;z-index:2}
+.sch-tbl tbody tr{border-bottom:1px solid var(--border)}
+.sch-tbl tbody tr:hover{background:var(--paper2)}
+.sch-tbl tbody tr.rnew{animation:rfl 1.5s ease}
+@keyframes rfl{0%{background:#d1fae5}100%{background:transparent}}
+.sch-tbl tbody td{padding:5px 7px;vertical-align:middle}
+.drag-h{cursor:grab;color:var(--ink4);font-size:13px;text-align:center;user-select:none}
+.drag-h:active{cursor:grabbing}
+.cedit{width:100%;background:transparent;border:none;outline:none;font-family:var(--ff-b);font-size:12px;color:var(--ink);padding:3px 4px;border-radius:4px;transition:background .15s;min-width:60px}
+.cedit:hover{background:var(--paper3)}.cedit:focus{background:var(--paper);box-shadow:0 0 0 2px rgba(26,92,58,.2)}
+.csel{background:transparent;border:none;outline:none;font-family:var(--ff-b);font-size:12px;color:var(--ink);cursor:pointer;padding:3px 4px;border-radius:4px;width:100%;transition:background .15s}
+.csel:hover{background:var(--paper3)}.csel:focus{background:var(--paper);box-shadow:0 0 0 2px rgba(26,92,58,.2)}
+.cchk{cursor:pointer;width:14px;height:14px;accent-color:var(--pine)}
+.rdel{background:none;border:none;cursor:pointer;color:var(--ink4);font-size:12px;padding:2px 4px;border-radius:3px;transition:all .12s}
+.rdel:hover{color:var(--crimson);background:var(--crim-light)}
+.add-frow{display:flex;align-items:center;gap:7px;padding:9px 13px;border-top:1px solid var(--border);background:var(--paper2);flex-shrink:0}
+.ref-side{display:flex;flex-direction:column;background:var(--paper2);overflow:hidden}
+.side-sec{padding:13px 15px;border-bottom:1px solid var(--border);flex-shrink:0}
+.side-sec h4{font-family:var(--ff-d);font-size:14px;margin-bottom:7px}
+.prompt-ta{width:100%;resize:none;background:var(--paper);border:1px solid var(--border2);border-radius:var(--r);padding:8px 11px;font-family:var(--ff-m);font-size:11px;color:var(--ink);outline:none;line-height:1.6}
+.prompt-ta:focus{border-color:var(--pine)}
+.fb-area{flex:1;overflow-y:auto;padding:11px 14px;display:flex;flex-direction:column;gap:8px}
+.fb-inp-row{padding:11px 14px;border-top:1px solid var(--border);flex-shrink:0}
+.fb-inp{width:100%;resize:none;background:var(--paper);border:1.5px solid var(--border2);border-radius:var(--r);padding:8px 10px;font-family:var(--ff-b);font-size:12px;color:var(--ink);outline:none}
+.fb-inp:focus{border-color:var(--pine)}
+.cmsg{display:flex;flex-direction:column;gap:3px}
+.cmsg.user .cbub{background:var(--pine);color:#fff;align-self:flex-end;border-radius:10px 10px 2px 10px}
+.cmsg.ai .cbub{background:var(--paper);border:1px solid var(--border2);align-self:flex-start;border-radius:10px 10px 10px 2px}
+.cbub{padding:7px 11px;font-size:12px;line-height:1.5;max-width:90%}
+.ctime{font-size:10px;color:var(--ink4);padding:0 4px}
+.cmsg.user .ctime{text-align:right}
+.diff-note{background:#fffbf5;border:1px solid rgba(180,83,9,.2);border-radius:var(--r);padding:8px 11px;font-size:11px}
+.diff-note strong{color:var(--amber)}
+.conf-bar-row{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--paper);border-top:1px solid var(--border);flex-shrink:0;font-size:11px;color:var(--ink2)}
+.ctrack{flex:1;height:4px;background:var(--paper3);border-radius:2px;overflow:hidden}
+.cfill{height:100%;border-radius:2px;transition:width .5s,background .5s}
+/* confirm */
+#screen-confirm{align-items:center;justify-content:center;padding:40px 24px}
+.conf-inner{max-width:540px;width:100%}
+.conf-inner h2{font-family:var(--ff-d);font-size:28px;margin-bottom:7px}
+.conf-inner>p{font-size:13px;color:var(--ink2);margin-bottom:22px}
+.conf-sum{background:var(--pine-pale);border:1px solid rgba(26,92,58,.15);border-radius:var(--rl);padding:13px 15px;margin-bottom:20px}
+.conf-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(26,92,58,.08);font-size:12px}
+.conf-row:last-child{border-bottom:none}
+.conf-row span:first-child{color:var(--ink2)}.conf-row span:last-child{font-weight:600;color:var(--pine)}
+/* extraction */
+#screen-extraction{flex-direction:row;overflow:hidden}
+.ext-side{width:288px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--border);display:flex;flex-direction:column;height:calc(100vh - 54px);overflow-y:auto;padding:15px 13px;gap:11px}
+.ext-main{flex:1;overflow:auto;padding:17px}
+.prof-badge{display:flex;align-items:flex-start;gap:9px;background:var(--pine-pale);border:1px solid rgba(26,92,58,.15);border-radius:var(--rl);padding:10px 12px}
+.pb-ico{font-size:19px;flex-shrink:0;margin-top:2px}
+.pb-name{font-weight:600;font-size:13px;color:var(--pine)}
+.pb-meta{font-size:11px;color:var(--ink3)}
+.tog-row{display:flex;align-items:center;justify-content:space-between;background:var(--paper2);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;font-size:11px;gap:8px}
+.tog-row label{color:var(--ink2);flex:1;line-height:1.4}
+.tog-sw{position:relative;width:36px;height:20px;flex-shrink:0;display:inline-block;cursor:pointer}
+.tog-track{position:absolute;inset:0;background:var(--paper3);border-radius:20px;transition:background .25s;display:block}
+.tog-track::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .25s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.tog-track.on{background:var(--pine)}
+.tog-track.on::after{transform:translateX(16px)}
+.sess-box{background:var(--pine-pale);border:1px solid rgba(26,92,58,.15);border-radius:var(--r);padding:9px 11px;font-size:11px}
+.sb-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.sb-row:last-child{margin-bottom:0}
+.sb-lbl{color:var(--ink2)}.sb-val{font-weight:600;color:var(--pine);font-family:var(--ff-m)}
+.q-list{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto}
+.q-item{display:flex;align-items:center;gap:6px;background:var(--paper2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px}
+.qi-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
+.qi-badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;flex-shrink:0;letter-spacing:.04em}
+.qi-pending{background:var(--paper3);color:var(--ink3)}
+.qi-running{background:var(--sky-light);color:var(--sky)}
+.qi-done{background:var(--pine-light);color:var(--pine)}
+.qi-error{background:var(--crim-light);color:var(--crimson)}
+.qi-rm{background:none;border:none;cursor:pointer;color:var(--ink4);font-size:12px;flex-shrink:0}
+.qi-rm:hover{color:var(--crimson)}
+.prog-wrap{background:var(--paper3);border-radius:20px;height:4px;overflow:hidden}
+.prog-fill{height:100%;background:var(--pine);border-radius:20px;transition:width .35s}
+.reg-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px}
+.reg-hdr h3{font-family:var(--ff-d);font-size:18px}
+.rec-ct{font-size:11px;background:var(--pine-light);color:var(--pine);border-radius:20px;padding:2px 10px;font-weight:600}
+.tbl-outer{overflow-x:auto;border:1px solid var(--border);border-radius:var(--rl);background:var(--paper)}
+.reg-tbl{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--ff-b)}
+.reg-tbl thead th{background:var(--paper2);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);padding:8px 9px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap;position:sticky;top:0;z-index:2}
+.reg-tbl tbody tr{border-bottom:1px solid var(--border)}
+.reg-tbl tbody tr:last-child{border-bottom:none}
+.reg-tbl tbody tr:hover{background:var(--paper2)}
+.reg-tbl tbody td{padding:6px 9px;vertical-align:top}
+.tr-new{animation:rfl 1.5s ease}.tr-saved{animation:rfl .8s ease}
+.cdate{white-space:nowrap;font-family:var(--ff-m);font-size:10px}
+.cwrap{min-width:90px;max-width:150px;white-space:normal;word-break:break-word}
+.badge{display:inline-block;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700}
+.byes{background:var(--pine-light);color:var(--pine)}.bno{background:var(--crim-light);color:var(--crimson)}
+.bdk{background:var(--amber-light);color:var(--amber)}.bna{background:var(--paper3);color:var(--ink3)}
+.tags{display:flex;flex-wrap:wrap;gap:2px}
+.tag{background:var(--sky-light);color:var(--sky);border-radius:3px;padding:1px 4px;font-size:10px}
+.cpill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px}
+.cp-h{background:var(--pine-light);color:var(--pine)}.cp-m{background:var(--amber-light);color:var(--amber)}.cp-l{background:var(--crim-light);color:var(--crimson)}
+.cbw{width:72px;height:3px;background:var(--paper3);border-radius:2px;margin-top:3px}
+.cb{height:100%;border-radius:2px}.cb-h{background:var(--pine-mid)}.cb-m{background:var(--amber)}.cb-l{background:var(--crimson)}
+.racts{display:flex;gap:3px}
+.ra{background:none;border:1px solid var(--border2);border-radius:4px;cursor:pointer;padding:3px 6px;font-size:11px;color:var(--ink2);transition:all .12s;line-height:1}
+.ra:hover{background:var(--paper2)}
+.ra.del:hover{background:var(--crim-light);color:var(--crimson);border-color:var(--crimson)}
+.empty-st{text-align:center;padding:48px 24px;color:var(--ink3)}
+.empty-st .esi{font-size:32px;margin-bottom:10px}
+.empty-st p{font-size:12px}
+/* drift modal */
+.drift-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px}
+.drift-box{background:var(--paper);border-radius:var(--rxl);border:1px solid var(--border);width:100%;max-width:520px;box-shadow:var(--sh-lg)}
+.dm-hdr{padding:17px 20px 11px;border-bottom:1px solid var(--border)}
+.dm-hdr h3{font-family:var(--ff-d);font-size:20px;margin-bottom:3px}
+.dm-hdr p{font-size:12px;color:var(--ink2)}
+.dm-body{padding:15px 20px}
+.dm-score{display:flex;align-items:center;gap:11px;margin-bottom:11px}
+.dm-circ{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--ff-d);font-size:15px;flex-shrink:0}
+.dch{background:var(--pine-light);color:var(--pine)}.dcm{background:var(--amber-light);color:var(--amber)}.dcl{background:var(--crim-light);color:var(--crimson)}
+.dm-diffs{display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto}
+.dm-di{font-size:11px;background:var(--paper2);border-radius:5px;padding:4px 9px;color:var(--ink2)}
+.dm-ftr{padding:11px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+/* edit modal */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-box{background:var(--paper);border-radius:var(--rxl);border:1px solid var(--border);width:100%;max-width:1100px;height:90vh;display:flex;flex-direction:column;box-shadow:var(--sh-lg);overflow:hidden}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--paper);flex-shrink:0;gap:10px}
+.modal-hdr h3{font-family:var(--ff-d);font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-hdr-tabs{display:flex;align-items:center;gap:2px;background:var(--paper2);border-radius:6px;padding:3px}
+.modal-tab{background:none;border:none;cursor:pointer;font-family:var(--ff-b);font-size:11px;font-weight:600;padding:4px 12px;border-radius:4px;color:var(--ink3);transition:all .15s}
+.modal-tab.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.modal-cls{background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink3);padding:0 4px;line-height:1;flex-shrink:0}
+.modal-cls:hover{color:var(--ink)}
+/* split pane */
+.modal-split{display:flex;flex:1;overflow:hidden;min-height:0}
+.modal-pdf-pane{width:50%;border-right:1px solid var(--border);display:flex;flex-direction:column;background:#525659;flex-shrink:0;position:relative}
+.modal-pdf-pane.hidden{display:none}
+.pdf-toolbar{display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(0,0,0,.35);flex-shrink:0}
+.pdf-toolbar span{font-family:var(--ff-m);font-size:10px;color:rgba(255,255,255,.7);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdf-no-src{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;color:rgba(255,255,255,.4);font-family:var(--ff-b);font-size:12px;gap:10px;padding:24px;text-align:center}
+.pdf-no-src .pns-ico{font-size:32px;opacity:.5}
+.pdf-embed{flex:1;border:none;min-height:0}
+.modal-fields-pane{flex:1;overflow-y:auto;display:flex;flex-direction:column;min-width:0}
+.modal-body{padding:15px 17px;display:flex;flex-direction:column;gap:11px;flex:1}
+.modal-ftr{padding:10px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--paper);flex-shrink:0}
+.modal-ftr-right{display:flex;gap:8px}
+.pdf-badge{font-size:10px;color:var(--ink3);font-family:var(--ff-m)}
+/* mobile: stacked tabs */
+@media(max-width:680px){
+  .modal-split{flex-direction:column}
+  .modal-pdf-pane{width:100%;height:45%;border-right:none;border-bottom:1px solid var(--border)}
+  .modal-pdf-pane.hidden{display:none}
+  .modal-box{max-width:100%;height:95vh}
+}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg>label{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.fsec{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding-top:4px;border-top:1px solid var(--border)}
+.mi{width:100%;border:1px solid var(--border2);border-radius:var(--r);padding:7px 10px;font-family:var(--ff-b);font-size:12px;color:var(--ink);background:var(--paper);outline:none;transition:border-color .15s}
+.mi:focus{border-color:var(--pine);box-shadow:0 0 0 2px rgba(26,92,58,.1)}
+.msel{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a877e'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px}
+/* buttons */
+.btn{font-family:var(--ff-b);font-size:12px;font-weight:600;border-radius:var(--r);padding:8px 15px;cursor:pointer;transition:all .15s;border:1px solid transparent;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-p{background:var(--pine);color:#fff;border-color:var(--pine)}.btn-p:hover:not(:disabled){background:var(--pine-mid)}
+.btn-p:disabled{opacity:.35;cursor:not-allowed}
+.btn-o{background:transparent;color:var(--ink2);border-color:var(--border3)}.btn-o:hover:not(:disabled){background:var(--paper2)}
+.btn-o:disabled{opacity:.35;cursor:not-allowed}
+.btn-d{background:var(--crim-light);color:var(--crimson);border-color:rgba(185,28,28,.2)}.btn-d:hover{background:var(--crimson);color:#fff}
+.btn-a{background:var(--amber-light);color:var(--amber);border-color:rgba(180,83,9,.2)}.btn-a:hover{background:var(--amber);color:#fff}
+.btn-sm{padding:5px 11px;font-size:11px}.btn-xs{padding:3px 8px;font-size:10px}.btn-full{width:100%;justify-content:center}
+/* status */
+.sbar{border-radius:var(--r);padding:8px 11px;font-size:11px;display:flex;align-items:flex-start;gap:7px}
+.sb-idle{background:var(--paper2);color:var(--ink2)}.sb-load{background:var(--sky-light);color:var(--sky)}
+.sb-ok{background:var(--pine-light);color:var(--pine)}.sb-err{background:var(--crim-light);color:var(--crimson)}.sb-warn{background:var(--amber-light);color:var(--amber)}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;flex-shrink:0;margin-top:1px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.divider{height:1px;background:var(--border)}
+.slabel{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px}
+input[type=file]{display:none}
+[data-tip]{position:relative;cursor:help}
+[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);font-size:10px;padding:4px 8px;border-radius:5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:999}
+[data-tip]:hover::after{opacity:1}
+
+/* ── API Key Panel ── */
+
+.apikey-panel{background:var(--paper);border:1.5px solid var(--border2);border-radius:var(--rxl);text-align:left;margin-bottom:20px;overflow:hidden;width:100%}
+.apikey-panel.connected{border-color:rgba(26,92,58,.3);background:var(--pine-pale)}
+.apikey-toggle{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;user-select:none;gap:10px;transition:background .15s}
+.apikey-toggle:hover{background:rgba(0,0,0,.03)}
+.apikey-hdr-left{display:flex;align-items:center;gap:9px}
+.apikey-status-dot{width:8px;height:8px;border-radius:50%;background:var(--ink4);flex-shrink:0;transition:background .3s}
+.apikey-status-dot.ok{background:var(--pine-mid)}
+.apikey-status-dot.err{background:var(--crimson)}
+.apikey-status-dot.checking{background:var(--amber);animation:pulse .8s infinite}
+.apikey-toggle-right{display:flex;align-items:center;gap:8px}
+.apikey-masked-inline{font-family:var(--ff-m);font-size:11px;color:var(--pine);letter-spacing:.04em}
+.apikey-chevron{font-size:11px;color:var(--ink3);transition:transform .2s;line-height:1}
+.apikey-chevron.open{transform:rotate(180deg)}
+.apikey-title{font-family:var(--ff-b);font-size:13px;font-weight:600;color:var(--ink)}
+.apikey-status-txt{font-size:11px;color:var(--ink3);line-height:1.4}
+.apikey-body{padding:0 16px 14px;border-top:1px solid var(--border);display:none}
+.apikey-body.open{display:block}
+.apikey-input-row{display:flex;gap:8px;margin-top:12px}
+.apikey-input{flex:1;border:1px solid var(--border2);border-radius:var(--r);padding:7px 11px;font-family:var(--ff-m);font-size:12px;color:var(--ink);background:var(--paper);outline:none;transition:border-color .15s;letter-spacing:.04em}
+.apikey-input:focus{border-color:var(--pine);box-shadow:0 0 0 2px rgba(26,92,58,.1)}
+.apikey-connected-row{display:flex;align-items:center;gap:8px;margin-top:12px}
+.apikey-masked{font-family:var(--ff-m);font-size:12px;color:var(--pine);letter-spacing:.05em;flex:1}
+.apikey-connected-btns{display:flex;gap:6px}
+.apikey-hint{font-size:10px;color:var(--ink3);margin-top:9px;line-height:1.55}
+.apikey-hint a{color:var(--pine);text-decoration:none}
+.apikey-hint a:hover{text-decoration:underline}
+/* topbar key indicator */
+.key-ind{display:flex;align-items:center;gap:5px;font-family:var(--ff-m);font-size:10px;cursor:pointer;padding:3px 8px;border-radius:4px;transition:background .15s}
+.key-ind:hover{background:rgba(255,255,255,.1)}
+.key-ind-dot{width:6px;height:6px;border-radius:50%;background:var(--ink4);flex-shrink:0}
+.key-ind-dot.ok{background:var(--pine-mid)}
+.key-ind-dot.err{background:var(--crimson)}
+.key-ind span{color:rgba(255,255,255,.45)}
+/* gate overlay — shown when no key set and user tries to proceed */
+.gate-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px}
+.gate-box{background:var(--paper);border-radius:var(--rxl);border:1px solid var(--border2);max-width:460px;width:100%;padding:28px 28px 24px;box-shadow:var(--sh-lg);text-align:center}
+.gate-icon{font-size:34px;margin-bottom:12px}
+.gate-title{font-family:var(--ff-d);font-size:22px;margin-bottom:8px}
+.gate-sub{font-size:13px;color:var(--ink2);margin-bottom:20px;line-height:1.6}
+.gate-inp-row{display:flex;gap:8px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<header class="topbar">
+  <button class="topbar-brand" id="home-btn">
+    <div class="brand-dot"></div>FormLens
+  </button>
+  <nav class="breadcrumb" id="breadcrumb" style="display:none">
+    <div class="bc-step" id="bc-1"><div class="bc-num">1</div><span>Discover</span></div>
+    <div class="bc-arr">&#8250;</div>
+    <div class="bc-step" id="bc-2"><div class="bc-num">2</div><span>Refine</span></div>
+    <div class="bc-arr">&#8250;</div>
+    <div class="bc-step" id="bc-3"><div class="bc-num">3</div><span>Confirm</span></div>
+    <div class="bc-arr">&#8250;</div>
+    <div class="bc-step" id="bc-4"><div class="bc-num">4</div><span>Extract</span></div>
+  </nav>
+  <div class="topbar-right">
+    <div class="key-ind" id="key-ind" onclick="goLanding()" title="API Key settings">
+      <div class="key-ind-dot" id="key-ind-dot"></div>
+      <span id="key-ind-txt">No API key</span>
+    </div>
+    <div class="stor-ind" id="stor-ind" style="display:none">
+      <div class="stor-dot" id="stor-dot"></div>
+      <span id="stor-lbl"></span>
+    </div>
+  </div>
+</header>
+
+<!-- LANDING -->
+<section class="screen active" id="screen-landing">
+  <div class="land-wrap">
+    <div class="land-inner">
+      <div class="land-eye">Adaptive Form Intelligence</div>
+      <h1 class="land-h">Extract any form,<br/><em>on your terms.</em></h1>
+      <p class="land-sub">Upload a sample PDF and let AI discover its structure. Refine the schema collaboratively, then extract any number of forms with precision.</p>
+    </div>
+
+    <!-- Collapsible API Key Panel -->
+    <div class="apikey-panel" id="apikey-panel">
+      <div class="apikey-toggle" onclick="toggleKeyPanel()">
+        <div class="apikey-hdr-left">
+          <div class="apikey-status-dot" id="ak-dot"></div>
+          <div>
+            <div class="apikey-title">Anthropic API Key</div>
+            <div class="apikey-status-txt" id="ak-status">Required to use FormLens</div>
+          </div>
+        </div>
+        <div class="apikey-toggle-right">
+          <span class="apikey-masked-inline" id="ak-masked-inline"></span>
+          <span class="apikey-chevron" id="ak-chevron">&#9660;</span>
+        </div>
+      </div>
+      <div class="apikey-body" id="ak-body">
+        <div id="ak-input-wrap">
+          <div class="apikey-input-row">
+            <input class="apikey-input" id="ak-input" type="password" placeholder="sk-ant-api03-&hellip;" autocomplete="off" spellcheck="false"/>
+            <button class="btn btn-p btn-sm" onclick="saveApiKey()">Save &amp; Verify</button>
+          </div>
+          <div class="apikey-hint">
+            Get your key at <a href="https://console.anthropic.com/keys" target="_blank">console.anthropic.com/keys</a>.
+            Stored only in your browser &mdash; never shared.
+          </div>
+        </div>
+        <div id="ak-connected-wrap" style="display:none">
+          <div class="apikey-connected-row">
+            <span class="apikey-masked" id="ak-masked"></span>
+            <div class="apikey-connected-btns">
+              <button class="btn btn-o btn-xs" onclick="showKeyInput()">Change</button>
+              <button class="btn btn-danger btn-xs" onclick="clearApiKey()">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resume Session -->
+    <div id="resume-sec" style="display:none">
+      <div class="res-card" id="resume-card" onclick="resumeSession()">
+        <div class="rc-icon">&#128190;</div>
+        <div><div class="rc-title" id="rc-title">Resume Previous Session</div><div class="rc-meta" id="rc-meta">Loading&hellip;</div></div>
+        <div class="rc-badge">Restore</div>
+      </div>
+    </div>
+
+    <!-- Action Cards -->
+    <div class="land-cards">
+      <div class="lcard" onclick="goDiscover()">
+        <div class="lc-icon">&#128269;</div>
+        <div class="lc-title">Discover New Schema</div>
+        <p class="lc-desc">Upload a sample form. AI analyses the structure and proposes a schema you refine interactively.</p>
+        <span class="lc-tag">New form type</span>
+      </div>
+      <div class="lcard" onclick="document.getElementById('prof-up').click()">
+        <div class="lc-icon">&#128194;</div>
+        <div class="lc-title">Load Saved Profile</div>
+        <p class="lc-desc">Upload a <code>.formprofile.json</code> file and jump straight to extraction.</p>
+        <span class="lc-tag amb">Existing profile</span>
+      </div>
+    </div>
+    <input type="file" id="prof-up" accept=".json,application/json" onchange="loadProfileFile(event)"/>
+
+    <div id="sess-profs-sec">
+      <div class="land-div">&mdash; or reload a profile from this session &mdash;</div>
+      <div class="prof-chips" id="sess-profs-list">
+        <span style="font-size:12px;color:var(--ink4)">No profiles saved yet this session</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DISCOVERY -->
+<section class="screen" id="screen-discovery">
+  <div class="disc-inner">
+    <div class="disc-hdr">
+      <h2>Upload a Sample Form</h2>
+      <p>Upload one example PDF. FormLens will analyse its structure and propose an initial schema and extraction prompt.</p>
+    </div>
+    <div class="dz-lg" id="disc-dz" onclick="document.getElementById('disc-fi').click()">
+      <div class="dz-ico">&#128196;</div>
+      <div class="dz-ttl">Drop your sample PDF here</div>
+      <div class="dz-sub">or click to browse &middot; one file only</div>
+      <div id="disc-pill" style="display:none"><div class="dz-pill">&#128206;<span id="disc-fname"></span></div></div>
+    </div>
+    <input type="file" id="disc-fi" accept=".pdf,application/pdf" onchange="setDiscFile(event)"/>
+    <div class="sbar sb-idle" id="disc-stat"><span>&#8505;</span><span id="disc-stxt">Upload a sample PDF to begin.</span></div>
+    <div style="display:flex;gap:10px;margin-top:17px">
+      <button class="btn btn-o" onclick="goLanding()">&larr; Back</button>
+      <button class="btn btn-p" id="disc-go" onclick="runDiscovery()" disabled style="flex:1">Analyse Form &amp; Generate Schema &rarr;</button>
+    </div>
+  </div>
+</section>
+
+<!-- REFINEMENT -->
+<section class="screen" id="screen-refinement">
+  <div class="ref-layout">
+    <div class="ref-main">
+      <div class="ref-mhdr">
+        <div><h3>Schema Editor</h3><div style="font-size:11px;color:var(--ink3);margin-top:2px">Edit cells &middot; drag rows to reorder &middot; add or remove fields</div></div>
+        <div class="hdr-acts">
+          <button class="btn btn-o btn-sm" onclick="addField()">+ Add Field</button>
+          <button class="btn btn-p btn-sm" onclick="goConfirm()">Looks Good &rarr;</button>
+        </div>
+      </div>
+      <div class="sch-wrap">
+        <table class="sch-tbl" id="sch-tbl">
+          <thead><tr>
+            <th></th>
+            <th>Field Path <span data-tip="dot.notation key in JSON">&#9432;</span></th>
+            <th>Display Label</th><th>Type</th>
+            <th>Allowed Values / Format</th><th>Required</th>
+            <th>Source Location</th><th></th>
+          </tr></thead>
+          <tbody id="sch-body"></tbody>
+        </table>
+      </div>
+      <div class="add-frow">
+        <input class="cedit" id="nfp" placeholder="new.field.path" style="max-width:160px"/>
+        <input class="cedit" id="nfl" placeholder="Display Label" style="max-width:140px"/>
+        <select class="csel" id="nft" style="max-width:95px">
+          <option value="text">text</option><option value="date">date</option><option value="time">time</option>
+          <option value="integer">integer</option><option value="decimal">decimal</option>
+          <option value="boolean">boolean</option><option value="enum">enum</option><option value="list">list</option>
+        </select>
+        <button class="btn btn-o btn-sm" onclick="addField()">Add</button>
+      </div>
+    </div>
+    <div class="ref-side">
+      <div class="side-sec">
+        <h4>Extraction Prompt</h4>
+        <textarea class="prompt-ta" id="ext-prompt" rows="7" placeholder="Extraction prompt appears after discovery&hellip;"></textarea>
+      </div>
+      <div style="padding:9px 14px;border-bottom:1px solid var(--border);flex-shrink:0"><div class="slabel">Refinement History</div></div>
+      <div class="fb-area" id="fb-area">
+        <div class="cmsg ai"><div class="cbub">Schema generated. Review the fields on the left and tell me what to change.</div><div class="ctime">Now</div></div>
+      </div>
+      <div class="fb-inp-row">
+        <textarea class="fb-inp" id="fb-inp" rows="3" placeholder="e.g. 'rename diagnosis_at_death to final_diagnosis' or 'add a ward name field'&hellip;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:7px">
+          <button class="btn btn-o btn-sm" style="flex:1" onclick="resetSchema()">Reset</button>
+          <button class="btn btn-p btn-sm" style="flex:2" id="refine-btn" onclick="runRefinement()">Refine Schema &rarr;</button>
+        </div>
+      </div>
+      <div class="conf-bar-row">
+        <span style="white-space:nowrap">Schema match</span>
+        <div class="ctrack"><div class="cfill" id="cfill" style="width:0%"></div></div>
+        <span id="cpct" style="min-width:32px;text-align:right;font-family:var(--ff-m)">&mdash;</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONFIRM -->
+<section class="screen" id="screen-confirm">
+  <div class="conf-inner">
+    <h2>Confirm &amp; Save Profile</h2>
+    <p>Name your schema profile and download it. Reload it any time to extract more forms without rediscovering the schema.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+      <div class="fg"><label class="slabel">Profile Name</label><input class="mi" id="prof-name" placeholder="e.g. CSD Mortality Review v1.0" style="font-size:14px;padding:10px 13px"/></div>
+      <div class="fg"><label class="slabel">Description (optional)</label><textarea class="mi" id="prof-desc" rows="2" placeholder="Brief description&hellip;"></textarea></div>
+    </div>
+    <div class="conf-sum" id="conf-sum"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-o" onclick="goScreen('screen-refinement')">&larr; Back</button>
+      <button class="btn btn-p btn-full" onclick="downloadAndProceed()">&#11015; Download Profile &amp; Start Extracting</button>
+    </div>
+    <div style="margin-top:9px;text-align:center;font-size:11px;color:var(--ink3)">Saves as <code id="prof-fn-prev">my-profile.formprofile.json</code></div>
+  </div>
+</section>
+
+<!-- EXTRACTION -->
+<section class="screen" id="screen-extraction">
+  <aside class="ext-side">
+    <div>
+      <div class="slabel">Active Profile</div>
+      <div class="prof-badge"><div class="pb-ico">&#128203;</div><div><div class="pb-name" id="pb-name">&mdash;</div><div class="pb-meta" id="pb-meta">&mdash;</div></div></div>
+      <div style="display:flex;gap:6px;margin-top:7px">
+        <button class="btn btn-o btn-xs" onclick="goScreen('screen-refinement')">Edit Schema</button>
+        <button class="btn btn-o btn-xs" onclick="goLanding()">Change Profile</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div>
+      <div class="slabel">Schema Drift Check</div>
+      <div class="tog-row">
+        <label for="drift-tog" style="font-size:11px">Run schema match check before each batch</label>
+        <div class="tog-sw" onclick="toggleDrift()" id="drift-tog-wrap"><span class="tog-track" id="drift-tog-track"></span></div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div>
+      <div class="slabel">Upload Forms</div>
+      <div id="ext-dz" onclick="document.getElementById('ext-fi').click()" style="border:1.5px dashed var(--border3);border-radius:var(--rl);padding:13px;text-align:center;cursor:pointer;background:var(--paper2);transition:all .15s">
+        <div style="font-size:19px;margin-bottom:4px">&#128194;</div>
+        <div style="font-size:12px;color:var(--ink2)">Click or drop PDFs</div>
+        <div style="font-size:10px;color:var(--ink3)">Multiple files supported</div>
+      </div>
+      <input type="file" id="ext-fi" accept=".pdf,application/pdf" multiple onchange="addExtFiles(event)"/>
+    </div>
+    <div id="q-sec" style="display:none">
+      <div class="slabel">Queue (<span id="q-ct">0</span>)</div>
+      <div class="q-list" id="q-list"></div>
+      <div class="prog-wrap" id="prog-wrap" style="display:none;margin-top:6px"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+    <button class="btn btn-p btn-full" id="ext-go" onclick="startExtraction()" disabled>Extract &amp; Append to Registry</button>
+    <div class="sbar sb-idle" id="ext-stat"><span>&#8505;</span><span id="ext-stxt">Upload PDFs to begin.</span></div>
+    <div class="divider"></div>
+    <div id="sess-stat-box" style="display:none">
+      <div class="sess-box">
+        <div class="sb-row"><span class="sb-lbl">Records saved</span><span class="sb-val" id="ssb-rec">0</span></div>
+        <div class="sb-row"><span class="sb-lbl">Last saved</span><span class="sb-val" id="ssb-time">&mdash;</span></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-o btn-sm" style="flex:1" onclick="saveSessionFile()" title="Download session to reload later">&#128190; Save Session</button>
+      <button class="btn btn-o btn-sm" style="flex:1" onclick="document.getElementById('sess-load-fi').click()" title="Load a saved session file">&#128194; Load Session</button>
+    </div>
+    <input type="file" id="sess-load-fi" accept=".json,application/json" onchange="loadSessionFile(event)"/>
+    <div class="divider"></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-o btn-sm" style="flex:1" onclick="exportCSV()">Export CSV</button>
+      <button class="btn btn-d btn-sm" style="flex:1" onclick="clearRegistry()" title="Clear all records and reset the queue">Clear Records</button>
+    </div>
+  </aside>
+  <div class="ext-main">
+    <div class="reg-hdr"><h3>Extraction Registry</h3><span class="rec-ct" id="rec-ct">0 records</span></div>
+    <div class="tbl-outer">
+      <table class="reg-tbl" id="reg-tbl">
+        <thead><tr id="reg-hdr-row"></tr></thead>
+        <tbody id="reg-body">
+          <tr id="empty-row"><td colspan="99"><div class="empty-st"><div class="esi">&#128194;</div><p>No records yet. Upload PDFs and click Extract.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- DRIFT MODAL -->
+<div class="drift-ov" id="drift-modal" style="display:none">
+  <div class="drift-box">
+    <div class="dm-hdr"><h3>&#9888; Schema Drift Detected</h3><p id="dm-fn"></p></div>
+    <div class="dm-body">
+      <div class="dm-score"><div class="dm-circ" id="dm-circ">&mdash;</div><div><div style="font-size:13px;font-weight:600" id="dm-verdict">&mdash;</div><div style="font-size:11px;color:var(--ink2);margin-top:2px" id="dm-sum">&mdash;</div></div></div>
+      <div class="slabel" style="margin-bottom:5px">Differences</div>
+      <div class="dm-diffs" id="dm-diffs"></div>
+    </div>
+    <div class="dm-ftr">
+      <button class="btn btn-o btn-sm" onclick="driftCancel()">Skip File</button>
+      <button class="btn btn-a btn-sm" onclick="driftRefine()">Update Profile First</button>
+      <button class="btn btn-p btn-sm" onclick="driftProceed()">Extract Anyway</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-ov" id="edit-modal" style="display:none" onclick="if(event.target===this)closeEdit()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-hdr">
+      <h3 id="edit-ttl">Edit Record</h3>
+      <div class="modal-hdr-tabs" id="modal-tabs" style="display:none">
+        <button class="modal-tab active" id="tab-form" onclick="switchTab('form')">&#128196; Form</button>
+        <button class="modal-tab" id="tab-fields" onclick="switchTab('fields')">&#9998; Edit Fields</button>
+      </div>
+      <button class="modal-cls" onclick="closeEdit()">&#10005;</button>
+    </div>
+    <div class="modal-split">
+      <div class="modal-pdf-pane" id="pdf-pane">
+        <div class="pdf-toolbar">
+          <span id="pdf-fname">No file</span>
+          <a id="pdf-dl-btn" class="btn btn-o btn-xs" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2);font-size:10px" title="Download original PDF">&#11015;</a>
+        </div>
+        <div id="pdf-viewer-wrap" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>
+      </div>
+      <div class="modal-fields-pane" id="fields-pane">
+        <div class="modal-body" id="edit-body"></div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <span class="pdf-badge" id="pdf-store-badge"></span>
+      <div class="modal-ftr-right">
+        <button class="btn btn-o btn-sm" onclick="closeEdit()">Cancel</button>
+        <button class="btn btn-p btn-sm" onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- API KEY GATE -->
+<div class="gate-overlay" id="gate-overlay" style="display:none">
+  <div class="gate-box">
+    <div class="gate-icon">&#128273;</div>
+    <div class="gate-title">API Key Required</div>
+    <p class="gate-sub">FormLens needs your Anthropic API key to analyse and extract forms. Your key is stored only in your browser and sent directly to <code>api.anthropic.com</code> &mdash; never anywhere else.</p>
+    <div class="gate-inp-row">
+      <input class="apikey-input" id="gate-inp" type="password" placeholder="sk-ant-api03-&hellip;" autocomplete="off" spellcheck="false" style="flex:1"/>
+      <button class="btn btn-p btn-sm" id="gate-save-btn" onclick="saveApiKeyFromGate()">Save &amp; Continue</button>
+    </div>
+    <div id="gate-status" style="font-size:11px;margin-top:8px;min-height:16px"></div>
+    <div class="apikey-hint" style="text-align:left;margin-top:6px">
+      Get your key at <a href="https://console.anthropic.com/keys" target="_blank" rel="noopener">console.anthropic.com/keys</a>
+    </div>
+    <button class="btn btn-o btn-sm btn-full" style="margin-top:12px" onclick="closeGate()">Cancel</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ── STATE ──
+const APP={profile:{name:'',description:'',createdAt:null,sampleFormHint:'',fields:[],extractionPrompt:'',columnOrder:[]},sessionProfiles:[],discoveryFile:null,originalSchema:null,extractQueue:[],extractRecords:[],extractRowIndex:0,editingId:null};
+// ── PERSISTENCE ──
+const SK='formlens_session_v1',SKM='formlens_meta_v1',DEB=1200;
+let _st=null;
+function toast(msg,type,dur){
+  if(!dur)dur=3200;
+  const c=document.getElementById('toast-wrap');if(!c)return;
+  const t=document.createElement('div');t.className='toast'+(type&&type!=='def'?' '+type:'');
+  const s=document.createElement('span');s.textContent=msg;t.appendChild(s);c.appendChild(t);
+  setTimeout(function(){t.style.animation='tin .25s ease reverse';setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},240);},dur);
+}
+function setStorInd(state,lbl){
+  const i=document.getElementById('stor-ind'),d=document.getElementById('stor-dot'),l=document.getElementById('stor-lbl');
+  if(!i)return;i.style.display=state==='none'?'none':'flex';
+  d.className='stor-dot'+(state==='saved'?' saved':state==='saving'?' saving':'');
+  if(l)l.textContent=lbl||'';
+}
+function buildBundle(){
+  // Strip transient object URLs before serialising — they die on page refresh anyway
+  const records=APP.extractRecords.map(function(r){
+    const copy=Object.assign({},r);
+    delete copy._pdfObjectUrl; // transient — don't persist
+    return copy;
+  });
+  return{version:1,savedAt:new Date().toISOString(),profile:APP.profile,extractRecords:records,extractRowIndex:APP.extractRowIndex};
+}
+function schedSave(){
+  clearTimeout(_st);setStorInd('saving','saving\u2026');
+  _st=setTimeout(function(){
+    try{
+      if(!APP.extractRecords.length&&!APP.profile.name){setStorInd('none');return;}
+      const b=buildBundle();
+      localStorage.setItem(SK,JSON.stringify(b));
+      localStorage.setItem(SKM,JSON.stringify({savedAt:b.savedAt,profileName:APP.profile.name||'Untitled',recordCount:APP.extractRecords.length,fieldCount:APP.profile.fields.length}));
+      updateSessBox();setStorInd('saved','saved');
+    }catch(e){console.warn('Autosave failed',e);setStorInd('none');}
+  },DEB);
+}
+function getMeta(){try{const r=localStorage.getItem(SKM);return r?JSON.parse(r):null;}catch(e){return null;}}
+function restoreBundle(b){
+  if(!b||b.version!==1)throw new Error('Unrecognised session format');
+  APP.profile=Object.assign({},APP.profile,b.profile||{});
+  APP.extractRecords=b.extractRecords||[];APP.extractRowIndex=b.extractRowIndex||0;
+  renderSchTable();
+  const pe=document.getElementById('ext-prompt');if(pe)pe.value=APP.profile.extractionPrompt||'';
+  buildRegHeader();
+  const tbody=document.getElementById('reg-body');
+  if(tbody){
+    tbody.innerHTML='';
+    if(APP.extractRecords.length){
+      APP.extractRecords.forEach(function(rec,i){const tr=document.createElement('tr');tr.id=rec._rowId||('rec-'+(i+1));rec._rowId=tr.id;tr.innerHTML=buildRegRow(i+1,rec);tbody.appendChild(tr);});
+    }else{tbody.innerHTML='<tr id="empty-row"><td colspan="99"><div class="empty-st"><div class="esi">&#128194;</div><p>No records yet.</p></div></td></tr>';}
+  }
+  updateProfBadge();updateSessBox();setStorInd('saved','restored');
+  const rc=document.getElementById('rec-ct');if(rc)rc.textContent=APP.extractRecords.length+' record'+(APP.extractRecords.length!==1?'s':'');
+}
+function resumeSession(){
+  if(!getApiKey()){requireKey(function(){resumeSession();});return;}
+  try{
+    const raw=localStorage.getItem(SK);if(!raw){toast('No saved session found','warn');return;}
+    restoreBundle(JSON.parse(raw));goExtract();
+    toast('Session restored \u2014 '+APP.extractRecords.length+' records loaded','ok');
+  }catch(e){toast('Could not restore: '+e.message,'err');console.error(e);}
+}
+function saveSessionFile(){
+  if(!APP.extractRecords.length&&!APP.profile.name){toast('Nothing to save yet','warn');return;}
+  const b=buildBundle(),slug=(APP.profile.name||'formlens-session').toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  trigDl(URL.createObjectURL(new Blob([JSON.stringify(b,null,2)],{type:'application/json'})),slug+'_'+new Date().toISOString().slice(0,10)+'.formlens-session.json');
+  toast('Session saved','ok');
+}
+function loadSessionFile(ev){
+  if(!getApiKey()){requireKey(function(){loadSessionFile(ev);});return;}
+  const f=ev.target.files[0];if(!f)return;ev.target.value='';
+  const r=new FileReader();r.onload=function(){
+    try{restoreBundle(JSON.parse(r.result));goExtract();toast('Session loaded \u2014 '+APP.extractRecords.length+' records restored','ok');}
+    catch(e){toast('Could not load: '+e.message,'err');console.error(e);}
+  };r.readAsText(f);
+}
+function updateSessBox(){
+  const box=document.getElementById('sess-stat-box'),re=document.getElementById('ssb-rec'),te=document.getElementById('ssb-time');
+  if(!box)return;
+  if(APP.extractRecords.length>0||APP.profile.name){
+    box.style.display='block';if(re)re.textContent=APP.extractRecords.length;
+    if(te)te.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }else{box.style.display='none';}
+}
+function updateResumeCard(){
+  const meta=getMeta(),sec=document.getElementById('resume-sec');if(!sec)return;
+  if(!meta||(!meta.recordCount&&!meta.profileName)){sec.style.display='none';return;}
+  sec.style.display='block';
+  const t=document.getElementById('rc-title'),m=document.getElementById('rc-meta');
+  if(t)t.textContent='Resume: '+(meta.profileName||'Previous Session');
+  if(m){const when=meta.savedAt?new Date(meta.savedAt).toLocaleString([],{dateStyle:'medium',timeStyle:'short'}):'unknown';m.textContent=(meta.recordCount||0)+' record'+(meta.recordCount!==1?'s':'')+' \u00B7 '+(meta.fieldCount||0)+' fields \u00B7 saved '+when;}
+}
+function clearLS(){try{localStorage.removeItem(SK);localStorage.removeItem(SKM);setStorInd('none');updateSessBox();updateResumeCard();}catch(e){}}
+// ── UTILS ──
+function mkField(o){return Object.assign({id:'f'+Date.now()+Math.random().toString(36).slice(2,6),path:'',label:'',type:'text',allowedValues:'',required:false,sourceHint:'',notes:''},o);}
+function goExtract(){
+  goScreen('screen-extraction');document.getElementById('breadcrumb').style.display='flex';
+  for(var i=1;i<=4;i++){const el=document.getElementById('bc-'+i);el.classList.remove('active','done');el.classList.add(i<4?'done':'active');}
+}
+const BCO=[null,'screen-discovery','screen-refinement','screen-confirm','screen-extraction'];
+function goScreen(id){
+  document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
+  document.getElementById(id).classList.add('active');APP.currentScreen=id;
+  const idx=BCO.indexOf(id),show=idx>=1;
+  document.getElementById('breadcrumb').style.display=show?'flex':'none';
+  if(show)for(var i=1;i<=4;i++){const el=document.getElementById('bc-'+i);el.classList.remove('active','done');if(i<idx)el.classList.add('done');else if(i===idx)el.classList.add('active');}
+}
+function goLanding(){goScreen('screen-landing');document.getElementById('breadcrumb').style.display='none';updateSessProfs();updateResumeCard();}
+function goDiscover(){
+  if(!getApiKey()){requireKey(function(){goScreen('screen-discovery');});return;}
+  goScreen('screen-discovery');
+}
+function goConfirm(){buildConfSum();goScreen('screen-confirm');}
+function ts(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function setStat(id,type,msg){
+  const el=document.getElementById(id);if(!el)return;
+  const m={idle:'sb-idle',loading:'sb-load',success:'sb-ok',error:'sb-err',warn:'sb-warn'};
+  el.className='sbar '+(m[type]||'sb-idle');
+  const icon=type==='loading'?'<span class="spin"></span>':'<span>'+(type==='success'?'&#10003;':type==='error'?'&#10007;':type==='warn'?'&#9888;':'&#8505;')+'</span>';
+  el.innerHTML=icon+'<span>'+msg+'</span>';
+}
+function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+function f2b64(file){return new Promise(function(res,rej){const r=new FileReader();r.onload=function(){res(r.result.split(',')[1])};r.onerror=function(){rej(new Error('Read failed'))};r.readAsDataURL(file);});}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtD(d){if(!d)return'';try{const[y,m,dy]=d.split('-');return dy+'/'+m+'/'+y;}catch(e){return d;}}
+function trigDl(url,fn){const a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},200);}
+function safeConfirm(msg){
+  return new Promise(function(resolve){
+    const ov=document.createElement('div');ov.className='sc-ov';
+    const box=document.createElement('div');box.className='sc-box';
+    const p=document.createElement('p');p.className='sc-msg';p.textContent=msg;
+    const btns=document.createElement('div');btns.className='sc-btns';
+    const cn=document.createElement('button');cn.className='btn btn-o btn-sm';cn.textContent='Cancel';
+    const ok=document.createElement('button');ok.className='btn btn-d btn-sm';ok.textContent='Confirm';
+    btns.appendChild(cn);btns.appendChild(ok);box.appendChild(p);box.appendChild(btns);ov.appendChild(box);document.body.appendChild(ov);
+    function done(r){if(ov.parentNode)ov.parentNode.removeChild(ov);resolve(r);}
+    ok.addEventListener('click',function(){done(true)});cn.addEventListener('click',function(){done(false)});ov.addEventListener('click',function(e){if(e.target===ov)done(false);});
+  });
+}
+// ── JSON PARSER ──
+function parseJSON(raw){
+  if(!raw||!raw.trim())throw new Error('Empty response');
+  let clean=raw.replace(/^```json\s*/im,'').replace(/^```\s*/im,'').replace(/```\s*$/gm,'').trim();
+  const fb=clean.indexOf('{'),lb=clean.lastIndexOf('}');
+  if(fb!==-1&&lb!==-1&&lb>fb)clean=clean.slice(fb,lb+1);
+  try{return JSON.parse(clean);}catch(_){}
+  let fixed=fixJSON(clean);
+  try{return JSON.parse(fixed);}catch(_){}
+  fixed=fixed.replace(/"extractionPrompt"\s*:\s*"([^"]*)"/s,function(_,p){return'"extractionPrompt":"'+p.slice(0,600).replace(/[^.!?]*$/,'')+'"';});
+  try{return JSON.parse(fixed);}catch(e){console.error('parseJSON failed. Raw:\n',raw.slice(0,400));throw new Error('Could not parse AI response \u2014 try again. ('+e.message+')');}
+}
+function fixJSON(s){
+  s=s.replace(/,(\s*[}\]])/g,'$1');
+  let out='',inStr=false,esc=false;
+  for(var i=0;i<s.length;i++){const c=s[i];if(esc){out+=c;esc=false;continue;}if(c==='\\'){out+=c;esc=true;continue;}if(c==='"'){out+=c;inStr=!inStr;continue;}if(inStr){if(c==='\n'){out+='\\n';continue;}if(c==='\r'){out+='\\r';continue;}if(c==='\t'){out+='\\t';continue;}if(c.charCodeAt(0)<32)continue;}out+=c;}
+  return out;
+}
+// ── API ──
+// ── API KEY MANAGEMENT ──
+const SK_KEY='formlens_apikey_v1';
+
+function getApiKey(){return localStorage.getItem(SK_KEY)||'';}
+
+function maskKey(k){if(!k||k.length<12)return'';return k.slice(0,10)+'&hellip;'+k.slice(-4);}
+
+function updateKeyUI(key,status){
+  // status: 'ok' | 'err' | 'none' | 'checking'
+  const dot=document.getElementById('ak-dot');
+  const statusTxt=document.getElementById('ak-status');
+  const panel=document.getElementById('apikey-panel');
+  const inputWrap=document.getElementById('ak-input-wrap');
+  const connWrap=document.getElementById('ak-connected-wrap');
+  const masked=document.getElementById('ak-masked');
+  const indDot=document.getElementById('key-ind-dot');
+  const indTxt=document.getElementById('key-ind-txt');
+
+  const msgs={ok:'Key verified — ready to use',err:'Key verification failed — check and re-enter',none:'No key configured — required to use FormLens',checking:'Verifying key…'};
+
+  if(dot){dot.className='apikey-status-dot'+(status==='ok'?' ok':status==='err'?' err':status==='checking'?' checking':'');}
+  if(statusTxt)statusTxt.textContent=msgs[status]||msgs.none;
+  if(panel){panel.className='apikey-panel'+(status==='ok'?' connected':'');}
+
+  const maskedInline=document.getElementById('ak-masked-inline');
+  if(key&&status==='ok'){
+    if(inputWrap)inputWrap.style.display='none';
+    if(connWrap)connWrap.style.display='block';
+    if(masked)masked.innerHTML=maskKey(key);
+    if(maskedInline)maskedInline.innerHTML=maskKey(key);
+    toggleKeyPanel(false); // collapse when key is set
+  } else {
+    if(inputWrap)inputWrap.style.display='block';
+    if(connWrap)connWrap.style.display='none';
+    if(maskedInline)maskedInline.innerHTML='';
+    toggleKeyPanel(true); // expand when no key
+  }
+
+  // Topbar indicator
+  if(indDot){indDot.className='key-ind-dot'+(status==='ok'?' ok':status==='err'?' err':'');}
+  if(indTxt){indTxt.textContent=status==='ok'?maskKey(key):'No API key';}
+  // Dim landing cards when no key — subtle signal without hard-blocking the UI
+  document.querySelectorAll('.lcard').forEach(function(el){
+    el.style.opacity=status==='ok'?'1':'0.45';
+    el.style.pointerEvents=status==='ok'?'':'auto'; // still clickable — gate handles the block
+    el.title=status==='ok'?'':el.querySelector('.lc-title')?.textContent+' — add your API key first';
+  });
+  document.querySelectorAll('.res-card').forEach(function(el){
+    el.style.opacity=status==='ok'?'1':'0.45';
+  });
+}
+
+function toggleKeyPanel(forceOpen){
+  const body=document.getElementById('ak-body');
+  const chev=document.getElementById('ak-chevron');
+  if(!body)return;
+  const isOpen=body.classList.contains('open');
+  const shouldOpen=forceOpen===true?true:forceOpen===false?false:!isOpen;
+  if(shouldOpen){body.classList.add('open');if(chev)chev.classList.add('open');}
+  else{body.classList.remove('open');if(chev)chev.classList.remove('open');}
+}
+function showKeyInput(){
+  toggleKeyPanel(true);
+  const inputWrap=document.getElementById('ak-input-wrap');
+  const connWrap=document.getElementById('ak-connected-wrap');
+  if(inputWrap)inputWrap.style.display='block';
+  if(connWrap)connWrap.style.display='none';
+  setTimeout(function(){const inp=document.getElementById('ak-input');if(inp)inp.focus();},150);
+}
+
+async function verifyKey(key){
+  // Make a minimal API call to verify the key works
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'Hi'}]})
+  });
+  return r.ok||(r.status===400); // 400 = request invalid but key accepted
+}
+
+async function saveApiKey(){
+  const inp=document.getElementById('ak-input');
+  const key=(inp?inp.value.trim():'');
+  if(!key){toast('Please enter your API key','warn');return;}
+  if(!key.startsWith('sk-ant-')){toast('Anthropic keys start with sk-ant-…','warn');return;}
+  updateKeyUI(key,'checking');
+  try{
+    const ok=await verifyKey(key);
+    if(ok){
+      localStorage.setItem(SK_KEY,key);
+      updateKeyUI(key,'ok');
+      if(inp)inp.value='';
+      toast('API key saved — FormLens is ready','ok');
+    } else {
+      updateKeyUI(key,'err');
+      toast('Key verification failed. Check the key and try again.','err');
+    }
+  }catch(e){
+    // Network error — save anyway (may work in production)
+    localStorage.setItem(SK_KEY,key);
+    updateKeyUI(key,'ok');
+    if(inp)inp.value='';
+    toast('Key saved (could not verify — network restricted)','warn');
+  }
+}
+
+function closeGate(){
+  document.getElementById('gate-overlay').style.display='none';
+  window._gateCallback=null;
+}
+async function saveApiKeyFromGate(){
+  const inp=document.getElementById('gate-inp');
+  const btn=document.getElementById('gate-save-btn');
+  const statEl=document.getElementById('gate-status');
+  const key=(inp?inp.value.trim():'');
+  if(!key){if(statEl)statEl.innerHTML='<span style="color:var(--amber)">Please enter your API key.</span>';return;}
+  if(!key.startsWith('sk-ant-')){if(statEl)statEl.innerHTML='<span style="color:var(--amber)">Anthropic keys start with sk-ant-…</span>';return;}
+  if(btn)btn.disabled=true;
+  if(statEl)statEl.innerHTML='<span style="color:var(--sky);display:flex;align-items:center;gap:6px"><span class="spin" style="width:10px;height:10px;border-color:var(--sky);border-top-color:transparent"></span>Verifying…</span>';
+  try{
+    const ok=await verifyKey(key);
+    if(ok){
+      localStorage.setItem(SK_KEY,key);
+      updateKeyUI(key,'ok');
+      if(inp)inp.value='';
+      if(statEl)statEl.innerHTML='';
+      document.getElementById('gate-overlay').style.display='none';
+      toast('API key saved — ready to use','ok');
+      const cb=window._gateCallback;window._gateCallback=null;
+      if(cb)setTimeout(cb,100);
+    } else {
+      if(statEl)statEl.innerHTML='<span style="color:var(--crimson)">Key verification failed — please check and try again.</span>';
+      if(btn)btn.disabled=false;
+    }
+  }catch(e){
+    // Network restricted (e.g. inside claude.ai sandbox) — save and trust key
+    localStorage.setItem(SK_KEY,key);
+    updateKeyUI(key,'ok');
+    if(inp)inp.value='';
+    if(statEl)statEl.innerHTML='';
+    document.getElementById('gate-overlay').style.display='none';
+    toast('API key saved','ok');
+    const cb=window._gateCallback;window._gateCallback=null;
+    if(cb)setTimeout(cb,100);
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+
+function clearApiKey(){
+  localStorage.removeItem(SK_KEY);
+  updateKeyUI('','none');
+  const inp=document.getElementById('ak-input');if(inp)inp.value='';
+  toast('API key removed');
+}
+
+function requireKey(callback){
+  const key=getApiKey();
+  if(key){callback();return;}
+  window._gateCallback=callback;
+  const overlay=document.getElementById('gate-overlay');
+  const statEl=document.getElementById('gate-status');
+  const btn=document.getElementById('gate-save-btn');
+  if(statEl)statEl.innerHTML='';
+  if(btn)btn.disabled=false;
+  if(overlay)overlay.style.display='flex';
+  setTimeout(function(){const gi=document.getElementById('gate-inp');if(gi){gi.value='';gi.focus();}},50);
+}
+
+async function claude(messages,sys,maxTok,retries){
+  if(!maxTok)maxTok=2000;if(retries===undefined)retries=2;
+  const key=getApiKey();
+  if(!key)throw new Error('No API key configured. Please add your Anthropic API key on the home screen.');
+  const headers={'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'};
+  for(let a=0;a<=retries;a++){
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTok,system:sys,messages})});
+    if(r.status===529||r.status===429){if(a<retries){await new Promise(function(x){setTimeout(x,2000*(a+1));});continue;}}
+    if(r.status===401){throw new Error('Invalid API key. Please update your key on the home screen.');}
+    if(!r.ok){const e=await r.json().catch(function(){return{};});throw new Error((e.error&&e.error.message)||'HTTP '+r.status);}
+    const d=await r.json();
+    if(d.stop_reason==='max_tokens')console.warn('Response hit max_tokens — may be truncated');
+    return(d.content||[]).map(function(b){return b.text||'';}).join('').trim();
+  }
+  throw new Error('API failed after retries');
+}
+// ── LANDING ──
+function updateSessProfs(){
+  const list=document.getElementById('sess-profs-list');
+  if(!APP.sessionProfiles.length){list.innerHTML='<span style="font-size:12px;color:var(--ink4)">No profiles saved yet this session</span>';return;}
+  list.innerHTML=APP.sessionProfiles.map(function(p,i){return'<div class="pchip" onclick="loadSessProf('+i+')">&#128203;<span>'+(p.name||'Untitled')+'</span><button class="pchip-del" onclick="event.stopPropagation();delSessProf('+i+')" title="Remove">&#10005;</button></div>';}).join('');
+}
+function loadSessProf(i){const p=APP.sessionProfiles[i];if(p)loadProfile(p);}
+function delSessProf(i){APP.sessionProfiles.splice(i,1);updateSessProfs();}
+function loadProfileFile(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(){try{loadProfile(JSON.parse(r.result));}catch(e){toast('Could not parse profile: '+e.message,'err');}};r.readAsText(f);ev.target.value='';}
+function loadProfile(p){
+  if(!getApiKey()){
+    requireKey(function(){loadProfile(p);});return;
+  }
+  APP.profile=Object.assign({},APP.profile,p);renderSchTable();
+  const pe=document.getElementById('ext-prompt');if(pe)pe.value=p.extractionPrompt||'';
+  updateProfBadge();buildRegHeader();updateSessBox();setStorInd('saved','profile loaded');goExtract();
+}
+// ── DISCOVERY ──
+const DISC_SYS='You are a form schema analyst. Analyse the uploaded PDF and return ONLY raw JSON:\n{"sampleFormHint":"one sentence","fields":[{"path":"dot.key","label":"Human Label","type":"text|date|time|integer|decimal|boolean|enum|list","allowedValues":"comma-sep for enum; format hint for date; else empty","required":true,"sourceHint":"where on the form","notes":"any ambiguity"}],"extractionPrompt":"Concise instructions max 400 words: layout, checkboxes, dates, skip-logic, field-type rules.","confidence":0.92,"confidenceNotes":"brief note"}\nRules: dot.notation for nesting. enum: list all options in allowedValues. Return ONLY raw JSON.';
+function setDiscFile(ev){const f=ev.target.files[0];if(f)applyDiscFile(f);ev.target.value='';}
+function applyDiscFile(f){APP.discoveryFile=f;document.getElementById('disc-fname').textContent=f.name;document.getElementById('disc-pill').style.display='block';document.getElementById('disc-go').disabled=false;setStat('disc-stat','idle','Ready: '+f.name);}
+async function runDiscovery(){
+  if(!APP.discoveryFile)return;
+  if(!getApiKey()){requireKey(function(){runDiscovery();});return;}
+  const btn=document.getElementById('disc-go');btn.disabled=true;
+  setStat('disc-stat','loading','Analysing form with AI\u2026');
+  try{
+    const b64=await f2b64(APP.discoveryFile);
+    const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Analyse this form and return the schema JSON.'}]}],DISC_SYS,4000);
+    const res=parseJSON(raw);
+    APP.profile.fields=(res.fields||[]).map(function(f){return mkField(f);});
+    APP.profile.extractionPrompt=res.extractionPrompt||'';APP.profile.sampleFormHint=res.sampleFormHint||'';APP.profile.createdAt=new Date().toISOString();
+    APP.originalSchema=JSON.parse(JSON.stringify(APP.profile.fields));
+    renderSchTable();document.getElementById('ext-prompt').value=APP.profile.extractionPrompt;
+    setConfBar(res.confidence,res.confidenceNotes);
+    addAIMsg('Schema discovered! Found <strong>'+APP.profile.fields.length+' fields</strong>.<br/>Confidence: <strong>'+Math.round((res.confidence||0.9)*100)+'%</strong><br/>'+(res.confidenceNotes||'Review the fields on the left.'));
+    setStat('disc-stat','success',APP.profile.fields.length+' fields discovered.');
+    setTimeout(function(){goScreen('screen-refinement');},600);
+  }catch(e){setStat('disc-stat','error','Discovery failed: '+e.message);console.error(e);}
+  finally{btn.disabled=false;}
+}
+// ── SCHEMA TABLE ──
+const FTYPES=['text','date','time','integer','decimal','boolean','enum','list'];
+function renderSchTable(){const tb=document.getElementById('sch-body');if(!tb)return;tb.innerHTML='';APP.profile.fields.forEach(function(f){tb.appendChild(mkRow(f));});initDrag();}
+function mkRow(f){
+  const tr=document.createElement('tr');tr.dataset.id=f.id;tr.draggable=true;
+  const opts=FTYPES.map(function(t){return'<option value="'+t+'"'+(t===f.type?' selected':'')+'>'+t+'</option>';}).join('');
+  tr.innerHTML='<td class="drag-h" title="Drag">&#8942;</td>'+
+    '<td><input class="cedit" data-f="path" value="'+esc(f.path)+'" placeholder="field.path"/></td>'+
+    '<td><input class="cedit" data-f="label" value="'+esc(f.label)+'" placeholder="Label"/></td>'+
+    '<td><select class="csel" data-f="type">'+opts+'</select></td>'+
+    '<td><input class="cedit" data-f="allowedValues" value="'+esc(f.allowedValues)+'" placeholder="Yes, No, Don\'t Know"/></td>'+
+    '<td style="text-align:center"><input type="checkbox" class="cchk" data-f="required"'+(f.required?' checked':'')+'/></td>'+
+    '<td><input class="cedit" data-f="sourceHint" value="'+esc(f.sourceHint)+'" placeholder="e.g. Q3 checkbox"/></td>'+
+    '<td><button class="rdel" onclick="delField(\''+f.id+'\')" title="Remove">&#10005;</button></td>';
+  tr.querySelectorAll('[data-f]').forEach(function(el){el.addEventListener(el.type==='checkbox'?'change':'input',function(){syncRow(tr);});});
+  return tr;
+}
+function syncRow(tr){const id=tr.dataset.id,f=APP.profile.fields.find(function(x){return x.id===id;});if(!f)return;tr.querySelectorAll('[data-f]').forEach(function(el){f[el.dataset.f]=el.type==='checkbox'?el.checked:el.value;});}
+function syncAll(){document.querySelectorAll('#sch-body tr[data-id]').forEach(function(tr){syncRow(tr);});}
+function delField(id){APP.profile.fields=APP.profile.fields.filter(function(f){return f.id!==id;});const tr=document.querySelector('#sch-body tr[data-id="'+id+'"]');if(tr)tr.remove();}
+function addField(){
+  const path=document.getElementById('nfp').value.trim(),label=document.getElementById('nfl').value.trim(),type=document.getElementById('nft').value;
+  if(!path){toast('Field path is required','warn');return;}
+  const f=mkField({path,label:label||path,type});APP.profile.fields.push(f);
+  const tr=mkRow(f);tr.classList.add('rnew');document.getElementById('sch-body').appendChild(tr);
+  document.getElementById('nfp').value='';document.getElementById('nfl').value='';
+}
+function syncOrder(){const rows=document.querySelectorAll('#sch-body tr[data-id]'),ord=[];rows.forEach(function(tr){const f=APP.profile.fields.find(function(x){return x.id===tr.dataset.id;});if(f)ord.push(f);});APP.profile.fields=ord;}
+function initDrag(){
+  const tb=document.getElementById('sch-body');let drag=null;
+  tb.addEventListener('dragstart',function(e){drag=e.target.closest('tr');if(drag)drag.style.opacity='.4';});
+  tb.addEventListener('dragend',function(){if(drag)drag.style.opacity='';drag=null;syncOrder();});
+  tb.addEventListener('dragover',function(e){e.preventDefault();const ov=e.target.closest('tr');if(ov&&ov!==drag){const rc=ov.getBoundingClientRect();if(e.clientY<rc.top+rc.height/2)tb.insertBefore(drag,ov);else if(ov.nextSibling)tb.insertBefore(drag,ov.nextSibling);else tb.appendChild(drag);}});
+}
+function setConfBar(score,notes){
+  const pct=Math.round((score||0)*100),fill=document.getElementById('cfill'),pctEl=document.getElementById('cpct');
+  if(!fill)return;fill.style.width=pct+'%';fill.style.background=pct>=85?'var(--pine)':pct>=65?'var(--amber)':'var(--crimson)';
+  pctEl.textContent=pct+'%';if(notes)pctEl.title=notes;
+}
+// ── CHAT ──
+function addUserMsg(txt){const a=document.getElementById('fb-area');a.insertAdjacentHTML('beforeend','<div class="cmsg user"><div class="cbub">'+esc(txt)+'</div><div class="ctime">'+ts()+'</div></div>');a.scrollTop=9999;}
+function addAIMsg(html){const a=document.getElementById('fb-area');a.insertAdjacentHTML('beforeend','<div class="cmsg ai"><div class="cbub">'+html+'</div><div class="ctime">'+ts()+'</div></div>');a.scrollTop=9999;}
+function addDiffNote(a,m,r){const parts=[];if(a)parts.push('<strong>+'+a+' added</strong>');if(m)parts.push('<strong>'+m+' modified</strong>');if(r)parts.push('<strong>\u2212'+r+' removed</strong>');if(!parts.length)return;const area=document.getElementById('fb-area');area.insertAdjacentHTML('beforeend','<div class="diff-note">Schema updated: '+parts.join(' &middot; ')+'</div>');area.scrollTop=9999;}
+// ── REFINEMENT ──
+const REF_SYS='You are a schema refinement assistant. Apply the user feedback to the schema and extraction prompt. Return ONLY raw JSON:\n{"fields":[...updated fields, preserve IDs where field still exists...],"extractionPrompt":"updated prompt","confidence":0.95,"confidenceNotes":"brief note","changesSummary":"one sentence","added":0,"modified":0,"removed":0}\nReturn ONLY raw JSON.';
+async function runRefinement(){
+  if(!getApiKey()){requireKey(function(){runRefinement();});return;}
+  const fb=document.getElementById('fb-inp').value.trim();if(!fb)return;
+  document.getElementById('fb-inp').value='';syncAll();
+  const btn=document.getElementById('refine-btn');btn.disabled=true;addUserMsg(fb);
+  const tid='t'+Date.now();document.getElementById('fb-area').insertAdjacentHTML('beforeend','<div class="cmsg ai" id="'+tid+'"><div class="cbub"><span class="spin"></span> Refining\u2026</div></div>');document.getElementById('fb-area').scrollTop=9999;
+  try{
+    const cf=APP.profile.fields.map(function(f){return{id:f.id,path:f.path,label:f.label,type:f.type,allowedValues:f.allowedValues,required:f.required,sourceHint:f.sourceHint};});
+    const cp=document.getElementById('ext-prompt').value;
+    const raw=await claude([{role:'user',content:'Current fields:\n'+JSON.stringify(cf,null,2)+'\n\nCurrent prompt:\n'+cp+'\n\nFeedback: '+fb}],REF_SYS,4000);
+    document.getElementById(tid)?.remove();
+    const res=parseJSON(raw);
+    const oi={};APP.profile.fields.forEach(function(f){oi[f.id]=f;});
+    APP.profile.fields=(res.fields||[]).map(function(f){return Object.assign({},oi[f.id]||{},mkField(f));});
+    APP.profile.extractionPrompt=res.extractionPrompt||cp;
+    document.getElementById('ext-prompt').value=APP.profile.extractionPrompt;
+    renderSchTable();setConfBar(res.confidence,res.confidenceNotes);
+    addAIMsg(esc(res.changesSummary||'Schema updated.')+(res.confidenceNotes?'<br/><span style="color:var(--ink3)">'+esc(res.confidenceNotes)+'</span>':''));
+    addDiffNote(res.added,res.modified,res.removed);
+  }catch(e){document.getElementById(tid)?.remove();addAIMsg('<span style="color:var(--crimson)">Error: '+esc(e.message)+'</span>');console.error(e);}
+  finally{btn.disabled=false;}
+}
+async function resetSchema(){
+  if(!APP.originalSchema)return;if(!await safeConfirm('Reset to originally discovered schema? All edits will be lost.'))return;
+  APP.profile.fields=JSON.parse(JSON.stringify(APP.originalSchema));renderSchTable();addAIMsg('Schema reset to original.');
+}
+// ── CONFIRM ──
+function buildConfSum(){
+  syncAll();APP.profile.extractionPrompt=document.getElementById('ext-prompt').value;
+  const c=APP.profile.fields.length,req=APP.profile.fields.filter(function(f){return f.required;}).length;
+  const types=[...new Set(APP.profile.fields.map(function(f){return f.type;}))].join(', ');
+  document.getElementById('conf-sum').innerHTML='<div class="conf-row"><span>Total fields</span><span>'+c+'</span></div><div class="conf-row"><span>Required</span><span>'+req+'</span></div><div class="conf-row"><span>Types used</span><span>'+types+'</span></div><div class="conf-row"><span>Prompt length</span><span>'+APP.profile.extractionPrompt.length+' chars</span></div><div class="conf-row"><span>Created</span><span>'+new Date().toLocaleDateString()+'</span></div>';
+  const n=document.getElementById('prof-name').value||'My Profile';document.getElementById('prof-fn-prev').textContent=slug(n)+'.formprofile.json';
+}
+function mkBundle(){
+  syncAll();APP.profile.name=document.getElementById('prof-name').value.trim()||'Untitled Profile';APP.profile.description=document.getElementById('prof-desc').value.trim();
+  APP.profile.extractionPrompt=document.getElementById('ext-prompt').value;APP.profile.columnOrder=APP.profile.fields.map(function(f){return f.path;});APP.profile.createdAt=new Date().toISOString();
+  return{name:APP.profile.name,description:APP.profile.description,createdAt:APP.profile.createdAt,sampleFormHint:APP.profile.sampleFormHint,fields:APP.profile.fields,extractionPrompt:APP.profile.extractionPrompt,columnOrder:APP.profile.columnOrder};
+}
+function downloadAndProceed(){
+  const b=mkBundle();trigDl(URL.createObjectURL(new Blob([JSON.stringify(b,null,2)],{type:'application/json'})),slug(b.name||'profile')+'.formprofile.json');
+  const ex=APP.sessionProfiles.findIndex(function(p){return p.name===b.name;});if(ex>=0)APP.sessionProfiles[ex]=b;else APP.sessionProfiles.push(b);
+  updateProfBadge();buildRegHeader();updateSessBox();setStorInd('saved','profile ready');goExtract();
+}
+// ── EXTRACTION SETUP ──
+function updateProfBadge(){document.getElementById('pb-name').textContent=APP.profile.name||'Untitled';document.getElementById('pb-meta').textContent=APP.profile.fields.length+' fields \u00B7 '+(APP.profile.createdAt?new Date(APP.profile.createdAt).toLocaleDateString():'now');}
+function buildRegHeader(){
+  const hr=document.getElementById('reg-hdr-row');if(!hr)return;
+  hr.innerHTML='<th style="width:52px"></th><th style="width:24px;text-align:center">#</th>'+APP.profile.fields.map(function(f){return'<th title="'+esc(f.sourceHint||f.path)+'">'+esc(f.label||f.path)+'</th>';}).join('')+'<th>Confidence</th>';
+}
+function addExtFiles(ev){addToQ([...ev.target.files]);ev.target.value='';}
+function addToQ(files){files.filter(function(f){return f.type==='application/pdf';}).forEach(function(f){APP.extractQueue.push({id:'q'+Date.now()+Math.random().toString(36).slice(2,6),file:f,name:f.name,status:'pending'});});renderQ();syncBtn();}
+function syncBtn(){document.getElementById('ext-go').disabled=!APP.extractQueue.some(function(q){return q.status==='pending';});}
+function renderQ(){
+  const any=APP.extractQueue.length>0;document.getElementById('q-sec').style.display=any?'block':'none';document.getElementById('q-ct').textContent=APP.extractQueue.length;
+  document.getElementById('q-list').innerHTML=APP.extractQueue.map(function(q){return'<div class="q-item"><span>&#128196;</span><span class="qi-name" title="'+esc(q.name)+'">'+esc(q.name)+'</span><span class="qi-badge qi-'+q.status+'">'+q.status+'</span>'+(q.status==='pending'?'<button class="qi-rm" onclick="rmQ(\''+q.id+'\')">&#10005;</button>':'')+'</div>';}).join('');
+}
+function rmQ(id){APP.extractQueue=APP.extractQueue.filter(function(q){return q.id!==id;});renderQ();syncBtn();}
+function setQStat(id,s){const q=APP.extractQueue.find(function(q){return q.id===id;});if(q){q.status=s;renderQ();}}
+// ── DRIFT ──
+const DRIFT_SYS='You are a form schema validator. Assess if a new PDF matches a saved schema. Return ONLY raw JSON:\n{"score":0.95,"level":"high|medium|low","verdict":"one sentence","differences":["list"],"summary":"one sentence"}\nScore: >=0.85=high, 0.65-0.84=medium, <0.65=low. Return ONLY raw JSON.';
+let _driftRes=null;
+function runDrift(file){
+  return new Promise(async function(resolve){
+    if(!window._driftEnabled){resolve('proceed');return;}
+    try{
+      const b64=await f2b64(file);
+      const hint=APP.profile.fields.slice(0,15).map(function(f){return f.path+' ('+f.type+')';}).join(', ');
+      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Profile: "'+APP.profile.name+'"\nHint: '+APP.profile.sampleFormHint+'\nExpected: '+hint+'\n\nDoes this form match?'}]}],DRIFT_SYS,800);
+      const res=parseJSON(raw);
+      if(res.score>=0.85){resolve('proceed');return;}
+      showDrift(file.name,res,resolve);
+    }catch(e){console.error('Drift check failed',e);resolve('proceed');}
+  });
+}
+function showDrift(fn,res,resolve){
+  _driftRes=resolve;const score=Math.round((res.score||0)*100),level=res.level||(score>=85?'high':score>=65?'medium':'low');
+  document.getElementById('dm-fn').textContent='File: '+fn;document.getElementById('dm-circ').textContent=score+'%';
+  document.getElementById('dm-circ').className='dm-circ '+(level==='high'?'dch':level==='medium'?'dcm':'dcl');
+  document.getElementById('dm-verdict').textContent=res.verdict||'';document.getElementById('dm-sum').textContent=res.summary||'';
+  document.getElementById('dm-diffs').innerHTML=(res.differences||[]).map(function(d){return'<div class="dm-di">&bull; '+esc(d)+'</div>';}).join('')||'<div class="dm-di">No specific differences listed.</div>';
+  document.getElementById('drift-modal').style.display='flex';
+}
+function driftCancel(){document.getElementById('drift-modal').style.display='none';if(_driftRes){_driftRes('skip');_driftRes=null;}}
+function driftProceed(){document.getElementById('drift-modal').style.display='none';if(_driftRes){_driftRes('proceed');_driftRes=null;}}
+function driftRefine(){document.getElementById('drift-modal').style.display='none';if(_driftRes){_driftRes('refine');_driftRes=null;}goScreen('screen-refinement');}
+// ── EXTRACTION ──
+function buildExtSys(){
+  const fl=APP.profile.fields.map(function(f){return'  - "'+f.path+'" ('+f.type+(f.required?', REQUIRED':'')+'):  '+f.label+(f.allowedValues?'. Values: '+f.allowedValues:'')+(f.sourceHint?'. Location: '+f.sourceHint:'');}).join('\n');
+  // Build an example skeleton so the model knows EXACTLY what keys to use
+  const skeleton={};
+  APP.profile.fields.forEach(function(f){
+    const parts=f.path.split('.');let cur=skeleton;
+    for(let i=0;i<parts.length-1;i++){if(!cur[parts[i]])cur[parts[i]]={};cur=cur[parts[i]];}
+    cur[parts[parts.length-1]]=f.type==='boolean'?false:f.type==='integer'||f.type==='decimal'?0:f.type==='list'?[]:null;
+  });
+  skeleton._confidence={overall_score:0.95,level:'High',low_confidence_fields:[],notes:null};
+  return APP.profile.extractionPrompt+
+    '\n\nEXTRACT THESE FIELDS FROM THE FORM:\n'+fl+
+    '\n\nCRITICAL: Return ONLY a raw JSON object using EXACTLY this structure (replace null values with actual extracted data):\n'+
+    JSON.stringify(skeleton,null,2)+
+    '\n\nRules: Dates -> ISO 8601 YYYY-MM-DD. Times -> HH:MM 24h. Booleans -> true/false. Enums -> exact string from allowed values or null. Lists -> JSON array. Numbers -> numeric not string. null for any field that is absent, blank, or not applicable. Do NOT add extra keys. Return ONLY the raw JSON object.';
+}
+async function startExtraction(){
+  if(!getApiKey()){requireKey(function(){startExtraction();});return;}
+  const pending=APP.extractQueue.filter(function(q){return q.status==='pending';});if(!pending.length)return;
+  document.getElementById('ext-go').disabled=true;
+  const wrap=document.getElementById('prog-wrap'),fill=document.getElementById('prog-fill');wrap.style.display='block';fill.style.width='0%';
+  let done=0,errors=0;const total=pending.length;setStat('ext-stat','loading','Extracting 1 / '+total+'\u2026');
+  for(let i=0;i<pending.length;i++){
+    const item=pending[i];setQStat(item.id,'running');
+    const dec=await runDrift(item.file);
+    if(dec==='skip'){setQStat(item.id,'error');errors++;done++;fill.style.width=Math.round(done/total*100)+'%';continue;}
+    if(dec==='refine'){setStat('ext-stat','warn','Paused \u2014 update schema then re-extract.');setQStat(item.id,'pending');document.getElementById('ext-go').disabled=false;return;}
+    try{
+      const b64=await f2b64(item.file);
+      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Extract all fields and return the JSON.'}]}],buildExtSys(),3000);
+      const ext=parseJSON(raw);ext._sourceFile=item.name;
+      if(!ext._confidence&&ext.confidence){ext._confidence=ext.confidence;delete ext.confidence;}
+      // Store PDF for in-modal viewing. Cap at 1.5MB compressed to protect localStorage.
+      const rawBytes=atob(b64).length;
+      if(rawBytes<1500000){
+        ext._pdfDataUrl='data:application/pdf;base64,'+b64; // persists to session file
+        ext._pdfObjectUrl=URL.createObjectURL(item.file);    // faster for current session
+      } else {
+        ext._pdfTooBig=true; // flag so modal can show a re-upload prompt
+      }
+      appendRow(ext);setQStat(item.id,'done');
+    }catch(e){errors++;setQStat(item.id,'error');console.error('Extraction failed:',item.name,e);}
+    done++;fill.style.width=Math.round(done/total*100)+'%';
+    if(done<total)setStat('ext-stat','loading','Extracting '+(done+1)+' / '+total+'\u2026');
+  }
+  if(errors)setStat('ext-stat','error','Done. '+(done-errors)+'/'+total+' succeeded, '+errors+' failed.');
+  else setStat('ext-stat','success','All '+total+' form'+(total!==1?'s':'')+' extracted.');
+  syncBtn();
+}
+// ── REGISTRY ──
+function resPath(obj,path){return path.split('.').reduce(function(o,k){return o!=null?o[k]:null;},obj);}
+function renderCell(val,field){
+  if(val===null||val===undefined||val==='')return'<span class="muted">&mdash;</span>';
+  switch(field.type){
+    case 'date':return'<span class="cdate">'+fmtD(String(val))+'</span>';
+    case 'time':return'<span class="cdate">'+val+'</span>';
+    case 'boolean':return val?'<span class="badge byes">Yes</span>':'<span class="badge bno">No</span>';
+    case 'enum':{const v=String(val);const c=v==='Yes'?'byes':v==='No'?'bno':v==="Don't Know"?'bdk':'bna';return'<span class="badge '+c+'">'+esc(v)+'</span>';}
+    case 'list':return Array.isArray(val)&&val.length?'<div class="tags">'+val.map(function(t){return'<span class="tag">'+esc(String(t))+'</span>';}).join('')+'</div>':'<span class="muted">&mdash;</span>';
+    case 'integer':case 'decimal':return'<span style="font-family:var(--ff-m);font-size:10px">'+val+'</span>';
+    default:return'<span class="cwrap">'+esc(String(val))+'</span>';
+  }
+}
+function renderConf(c){
+  if(!c)return'<span class="muted">&mdash;</span>';
+  const sc=c.overall_score!=null?Number(c.overall_score):null,level=c.level||(sc!=null?(sc>=0.85?'High':sc>=0.65?'Medium':'Low'):null),pct=sc!=null?Math.round(sc*100):null,cls=level==='High'?'h':level==='Medium'?'m':'l';
+  const tip=(c.low_confidence_fields||[]).length?'title="Uncertain: '+c.low_confidence_fields.join(', ')+'"':'';
+  return'<div><span class="cpill cp-'+cls+'" '+tip+'>'+(level||'?')+(pct!=null?' &middot; '+pct+'%':'')+'</span>'+(pct!=null?'<div class="cbw"><div class="cb cb-'+cls+'" style="width:'+pct+'%"></div></div>':'')+(c.notes?'<div style="font-size:10px;color:var(--ink3);margin-top:2px;max-width:120px">'+esc(c.notes)+'</div>':'')+'</div>';
+}
+function buildRegRow(num,data){
+  const cells=APP.profile.fields.map(function(f){return'<td>'+renderCell(resPath(data,f.path),f)+'</td>';}).join('');
+  const hasPdf=!!(data._pdfObjectUrl||data._pdfDataUrl);
+  const editTitle=hasPdf?'Edit &amp; View Form':'Edit record';
+  return'<td><div class="racts"><button class="ra" onclick="openEdit(\''+data._rowId+'\')" title="'+editTitle+'">&#9998;'+(hasPdf?' <span style="font-size:9px" title="PDF stored">&#128196;</span>':'')+'</button><button class="ra del" onclick="delRec(\''+data._rowId+'\')" title="Delete">&#128465;</button></div></td>'+
+    '<td style="text-align:center;color:var(--ink3);font-family:var(--ff-m);font-size:11px">'+num+'</td>'+cells+'<td>'+renderConf(data._confidence)+'</td>';
+}
+function appendRow(data){
+  const er=document.getElementById('empty-row');if(er)er.remove();
+  APP.extractRowIndex++;data._rowId='rec-'+APP.extractRowIndex;APP.extractRecords.push(data);
+  const tr=document.createElement('tr');tr.id=data._rowId;tr.classList.add('tr-new');tr.innerHTML=buildRegRow(APP.extractRowIndex,data);
+  document.getElementById('reg-body').appendChild(tr);
+  document.getElementById('rec-ct').textContent=APP.extractRecords.length+' record'+(APP.extractRecords.length!==1?'s':'');
+  schedSave();
+}
+async function delRec(rid){
+  if(!await safeConfirm('Delete this record? This cannot be undone.'))return;
+  APP.extractRecords=APP.extractRecords.filter(function(r){return r._rowId!==rid;});
+  document.getElementById(rid)?.remove();
+  if(!APP.extractRecords.length)document.getElementById('reg-body').innerHTML='<tr id="empty-row"><td colspan="99"><div class="empty-st"><div class="esi">&#128194;</div><p>No records yet.</p></div></td></tr>';
+  document.getElementById('rec-ct').textContent=APP.extractRecords.length+' record'+(APP.extractRecords.length!==1?'s':'');
+  schedSave();
+}
+async function clearRegistry(){
+  if(!APP.extractRecords.length)return;if(!await safeConfirm('Clear all records and reset the queue? This cannot be undone.'))return;
+  APP.extractRecords=[];APP.extractRowIndex=0;APP.extractQueue=[];
+  document.getElementById('reg-body').innerHTML='<tr id="empty-row"><td colspan="99"><div class="empty-st"><div class="esi">&#128194;</div><p>No records yet.</p></div></td></tr>';
+  document.getElementById('rec-ct').textContent='0 records';document.getElementById('prog-wrap').style.display='none';document.getElementById('prog-fill').style.width='0%';
+  renderQ();syncBtn();clearLS();toast('Registry cleared');
+}
+// ── EDIT MODAL ──
+function switchTab(tab){
+  const fp=document.getElementById('pdf-pane'),ep=document.getElementById('fields-pane');
+  const tf=document.getElementById('tab-form'),te=document.getElementById('tab-fields');
+  if(tab==='form'){
+    fp.style.display='flex';ep.style.display='none';
+    if(tf){tf.classList.add('active');}if(te){te.classList.remove('active');}
+  } else {
+    fp.style.display='none';ep.style.display='flex';ep.style.flexDirection='column';
+    if(te){te.classList.add('active');}if(tf){tf.classList.remove('active');}
+  }
+}
+
+function renderPdfPane(data){
+  const pane=document.getElementById('pdf-pane');
+  const wrap=document.getElementById('pdf-viewer-wrap');
+  const tabs=document.getElementById('modal-tabs');
+  const badge=document.getElementById('pdf-store-badge');
+  const dlBtn=document.getElementById('pdf-dl-btn');
+  const fnEl=document.getElementById('pdf-fname');
+  if(!pane||!wrap)return;
+
+  // Reset
+  wrap.innerHTML='';
+  if(fnEl)fnEl.textContent=data._sourceFile||'Original form';
+
+  // Prefer in-session object URL (revoked on close), fall back to data URL
+  const src=data._pdfObjectUrl||data._pdfDataUrl||null;
+
+  if(data._pdfTooBig){
+    // PDF was too large to store
+    wrap.innerHTML='<div class="pdf-no-src"><div class="pns-ico">&#128196;</div><div><strong>'+esc(data._sourceFile||'Form')+'</strong><br/>This PDF was too large to store for preview (&gt;1.5 MB).<br/>Re-upload the file below to view it.</div><input type="file" id="pdf-reup" accept=".pdf" style="margin-top:10px" onchange="reuploadPdf(event)"/></div>';
+    pane.style.display='flex';
+    if(tabs)tabs.style.display='none';
+    if(badge)badge.textContent='PDF not stored (too large)';
+    if(dlBtn)dlBtn.style.display='none';
+    return;
+  }
+
+  if(!src){
+    // Loaded from a session file restore — data URL not available
+    wrap.innerHTML='<div class="pdf-no-src"><div class="pns-ico">&#128196;</div><div><strong>'+esc(data._sourceFile||'Form')+'</strong><br/>Form preview not available for sessions loaded from file.<br/>Re-upload the original PDF to view it.</div><input type="file" id="pdf-reup" accept=".pdf" style="margin-top:10px" onchange="reuploadPdf(event)"/></div>';
+    pane.style.display='flex';
+    if(tabs)tabs.style.display='none';
+    if(badge)badge.textContent='Re-upload to view';
+    if(dlBtn)dlBtn.style.display='none';
+    return;
+  }
+
+  // Render PDF in embed
+  const embed=document.createElement('embed');
+  embed.src=src+'#toolbar=1&navpanes=0&scrollbar=1';
+  embed.type='application/pdf';
+  embed.className='pdf-embed';
+  embed.style.cssText='flex:1;border:none;min-height:0;width:100%';
+  wrap.appendChild(embed);
+
+  // Set up download button
+  if(dlBtn){
+    dlBtn.style.display='';
+    dlBtn.href=src;
+    dlBtn.download=data._sourceFile||'form.pdf';
+  }
+
+  pane.style.display='flex';
+  if(tabs)tabs.style.display='none'; // show only on mobile; on desktop both panes visible
+  if(badge)badge.textContent=data._pdfObjectUrl?'PDF stored in session':'PDF stored in session file';
+
+  // On narrow viewports, switch to tabs mode
+  if(window.innerWidth<=680&&tabs){tabs.style.display='flex';}
+}
+
+function reuploadPdf(event){
+  const file=event.target.files[0];if(!file)return;
+  const data=APP.extractRecords.find(function(r){return r._rowId===APP.editingId;});if(!data)return;
+  // Store object URL for this session
+  data._pdfObjectUrl=URL.createObjectURL(file);
+  data._pdfTooBig=false;
+  renderPdfPane(data);
+  toast('PDF loaded for preview','ok');
+}
+
+function openEdit(rid){
+  APP.editingId=rid;const data=APP.extractRecords.find(function(r){return r._rowId===rid;});if(!data)return;
+  document.getElementById('edit-ttl').textContent='Edit Record \u00B7 '+(resPath(data,APP.profile.fields[0]?.path)||rid);
+  // Render PDF pane
+  renderPdfPane(data);
+  // Restore split-pane defaults for desktop (both panes visible)
+  const fp=document.getElementById('pdf-pane'),ep=document.getElementById('fields-pane');
+  if(fp&&window.innerWidth>680){fp.style.display='flex';}
+  if(ep){ep.style.display='flex';ep.style.flexDirection='column';}
+  const conf=data._confidence||{};
+  const groups=APP.profile.fields.map(function(f){
+    const val=resPath(data,f.path),n='ef__'+f.path.replace(/\./g,'__');let inp='';
+    switch(f.type){
+      case 'boolean':inp='<select class="mi msel" name="'+n+'"><option value="">&#8212;</option><option value="true"'+(val===true?' selected':'')+'>Yes / True</option><option value="false"'+(val===false?' selected':'')+'>No / False</option></select>';break;
+      case 'enum':{const opts=(f.allowedValues||'').split(',').map(function(s){return s.trim();}).filter(Boolean);inp='<select class="mi msel" name="'+n+'"><option value="">&#8212;</option>'+opts.map(function(o){return'<option value="'+esc(o)+'"'+(o===String(val||'')?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>';break;}
+      case 'date':inp='<input class="mi" type="date" name="'+n+'" value="'+(val||'')+'"/>';break;
+      case 'time':inp='<input class="mi" type="time" name="'+n+'" value="'+(val||'')+'"/>';break;
+      case 'integer':case 'decimal':inp='<input class="mi" type="number" name="'+n+'" value="'+(val!=null?val:'')+'"/>';break;
+      case 'list':inp='<textarea class="mi" name="'+n+'" rows="2" style="resize:vertical">'+(Array.isArray(val)?val.join('\n'):(val||''))+'</textarea>';break;
+      default:inp='<input class="mi" name="'+n+'" value="'+esc(val!=null?String(val):'')+'"/ >';break;
+    }
+    return'<div class="fg"><label>'+esc(f.label||f.path)+' <span style="color:var(--ink4);font-weight:400">('+f.type+')</span></label>'+inp+'</div>';
+  });
+  const pairs=[];for(let i=0;i<groups.length;i+=2){pairs.push(groups[i+1]?'<div class="frow">'+groups[i]+groups[i+1]+'</div>':groups[i]);}
+  document.getElementById('edit-body').innerHTML=pairs.join('')+
+    '<div class="fsec">Extraction Confidence</div>'+
+    '<div class="frow"><div class="fg"><label>Level</label><select class="mi msel" name="ef__conf_level"><option value="">&#8212;</option>'+['High','Medium','Low'].map(function(l){return'<option value="'+l+'"'+(l===conf.level?' selected':'')+'>'+l+'</option>';}).join('')+'</select></div>'+
+    '<div class="fg"><label>Score (0&ndash;1)</label><input class="mi" type="number" step="0.01" min="0" max="1" name="ef__conf_score" value="'+(conf.overall_score!=null?conf.overall_score:'')+'"/></div></div>'+
+    '<div class="fg"><label>Notes</label><input class="mi" name="ef__conf_notes" value="'+esc(conf.notes||'')+'"/></div>';
+  document.getElementById('edit-modal').style.display='flex';
+}
+function closeEdit(){
+  document.getElementById('edit-modal').style.display='none';
+  // Clean up: clear embed src to stop PDF rendering and free GPU memory
+  const wrap=document.getElementById('pdf-viewer-wrap');if(wrap)wrap.innerHTML='';
+  APP.editingId=null;
+}
+function saveEdit(){
+  const rid=APP.editingId,data=APP.extractRecords.find(function(r){return r._rowId===rid;});if(!data)return;
+  const mb=document.getElementById('edit-body');
+  const g=function(n){const e=mb.querySelector('[name="'+n+'"]');return e?e.value.trim()||null:null;};
+  const gn=function(n){const e=mb.querySelector('[name="'+n+'"]');return e&&e.value!==''?Number(e.value):null;};
+  APP.profile.fields.forEach(function(f){
+    const n='ef__'+f.path.replace(/\./g,'__'),el=mb.querySelector('[name="'+n+'"]');if(!el)return;
+    let v;
+    switch(f.type){case 'boolean':v=el.value==='true'?true:el.value==='false'?false:null;break;case 'integer':v=el.value!==''?parseInt(el.value,10):null;break;case 'decimal':v=el.value!==''?parseFloat(el.value):null;break;case 'list':v=el.value.split('\n').map(function(s){return s.trim();}).filter(Boolean);break;default:v=el.value.trim()||null;}
+    setPath(data,f.path,v);
+  });
+  const cs=gn('ef__conf_score'),cl=g('ef__conf_level');
+  data._confidence={overall_score:cs,level:cl||(cs!=null?(cs>=0.85?'High':cs>=0.65?'Medium':'Low'):null),low_confidence_fields:data._confidence?.low_confidence_fields||[],notes:g('ef__conf_notes')};
+  const idx=APP.extractRecords.findIndex(function(r){return r._rowId===rid;})+1,tr=document.getElementById(rid);
+  if(tr){tr.innerHTML=buildRegRow(idx,data);tr.classList.remove('tr-new','tr-saved');void tr.offsetWidth;tr.classList.add('tr-saved');}
+  closeEdit();schedSave();
+}
+function setPath(obj,path,val){const p=path.split('.');let c=obj;for(let i=0;i<p.length-1;i++){if(c[p[i]]==null||typeof c[p[i]]!=='object')c[p[i]]={};c=c[p[i]];}c[p[p.length-1]]=val;}
+// ── EXPORT ──
+function exportCSV(){
+  if(!APP.extractRecords.length){toast('No records to export','warn');return;}
+  const hdr=['#',...APP.profile.fields.map(function(f){return f.label||f.path;}),'Confidence Level','Confidence Score','Source File'];
+  const rows=APP.extractRecords.map(function(data,i){
+    const cells=APP.profile.fields.map(function(f){const v=resPath(data,f.path);if(v===null||v===undefined)return'';if(Array.isArray(v))return v.join('; ');if(f.type==='date')return fmtD(String(v));return String(v);});
+    const c=data._confidence||{};return[i+1,...cells,c.level||'',c.overall_score!=null?c.overall_score:'',data._sourceFile||''].map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(',');
+  });
+  trigDl(URL.createObjectURL(new Blob([[hdr.map(function(h){return'"'+h+'"';}).join(','),...rows].join('\n')],{type:'text/csv'})),slug(APP.profile.name||'registry')+'_export.csv');
+}
+// ── INIT ──
+window.goLanding=goLanding;window.resumeSession=resumeSession;window.saveSessionFile=saveSessionFile;
+window._driftEnabled=true;
+function toggleDrift(){
+  window._driftEnabled=!window._driftEnabled;
+  const track=document.getElementById('drift-tog-track');
+  if(track){if(window._driftEnabled)track.classList.add('on');else track.classList.remove('on');}
+}
+function initToggle(){
+  const track=document.getElementById('drift-tog-track');
+  if(track)track.classList.add('on'); // ON by default
+}
+document.addEventListener('DOMContentLoaded',function(){
+  updateSessProfs();updateResumeCard();initToggle();
+  // Restore API key UI state
+  const savedKey=getApiKey();
+  if(savedKey){updateKeyUI(savedKey,'ok');}else{updateKeyUI('','none');}
+  // Allow Enter in key inputs
+  document.getElementById('ak-input')?.addEventListener('keydown',function(e){if(e.key==='Enter')saveApiKey();});
+  document.getElementById('gate-inp')?.addEventListener('keydown',function(e){if(e.key==='Enter')saveApiKeyFromGate();});
+  document.querySelectorAll('.topbar-brand,#home-btn').forEach(function(el){el.addEventListener('click',goLanding);});
+  document.getElementById('prof-name')?.addEventListener('input',function(e){const el=document.getElementById('prof-fn-prev');if(el)el.textContent=slug(e.target.value||'my-profile')+'.formprofile.json';});
+  document.getElementById('fb-inp')?.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();runRefinement();}});
+  var dz=document.getElementById('disc-dz');
+  if(dz){dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag');});dz.addEventListener('dragleave',function(){dz.classList.remove('drag');});dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag');var f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')applyDiscFile(f);});}
+  var edz=document.getElementById('ext-dz');
+  if(edz){edz.addEventListener('dragover',function(e){e.preventDefault();edz.style.background='var(--pine-pale)';edz.style.borderColor='var(--pine)';});edz.addEventListener('dragleave',function(){edz.style.background='';edz.style.borderColor='';});edz.addEventListener('drop',function(e){e.preventDefault();edz.style.background='';edz.style.borderColor='';addToQ([...e.dataTransfer.files].filter(function(f){return f.type==='application/pdf';}));});}
+  // Breadcrumb navigation
+  for(var i=1;i<=4;i++){(function(idx){const el=document.getElementById('bc-'+idx);if(el)el.addEventListener('click',function(){if(el.classList.contains('done')||el.classList.contains('active')){const targets=[null,'screen-discovery','screen-refinement','screen-confirm','screen-extraction'];goScreen(targets[idx]);}});})(i);}
+});
+</script>
+</body>
+</html>
