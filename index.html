@@ -158,7 +158,7 @@ body{font-family:var(--ff-b);background:var(--paper);color:var(--ink);line-heigh
 /* extraction */
 #screen-extraction{flex-direction:row;overflow:hidden}
 .ext-side{width:288px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%;overflow-y:auto;padding:15px 13px;gap:11px}
-.ext-main{flex:1;overflow-y:auto;overflow-x:auto;height:100%;padding:17px}
+.ext-main{flex:1;overflow:auto;height:100%;padding:0 0 17px 17px}
 .prof-badge{display:flex;align-items:flex-start;gap:9px;background:var(--pine-pale);border:1px solid rgba(26,92,58,.15);border-radius:var(--rl);padding:10px 12px}
 .pb-ico{font-size:19px;flex-shrink:0;margin-top:2px}
 .pb-name{font-weight:600;font-size:13px;color:var(--pine)}
@@ -186,16 +186,17 @@ body{font-family:var(--ff-b);background:var(--paper);color:var(--ink);line-heigh
 .qi-rm:hover{color:var(--crimson)}
 .prog-wrap{background:var(--paper3);border-radius:20px;height:4px;overflow:hidden}
 .prog-fill{height:100%;background:var(--pine);border-radius:20px;transition:width .35s}
-.reg-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px}
+.reg-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:0;padding:14px 17px 12px 0;position:sticky;top:0;z-index:11;background:var(--paper)}
 .reg-hdr h3{font-family:var(--ff-d);font-size:18px}
 .rec-ct{font-size:11px;background:var(--pine-light);color:var(--pine);border-radius:20px;padding:2px 10px;font-weight:600}
-.tbl-outer{overflow-x:auto;border:1px solid var(--border);border-radius:var(--rl);background:var(--paper)}
-.reg-tbl{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--ff-b)}
-.reg-tbl thead th{background:var(--paper2);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);padding:8px 9px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap;position:sticky;top:0;z-index:2}
+.tbl-outer{border:1px solid var(--border);border-radius:var(--rl);background:var(--paper);min-width:100%;width:max-content;margin-right:17px}
+.reg-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;font-family:var(--ff-b)}
+.reg-tbl thead th{background:var(--paper2);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);padding:8px 9px;text-align:left;border-bottom:1px solid var(--border2);white-space:nowrap;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--border2)}
 .reg-tbl tbody tr{border-bottom:1px solid var(--border)}
-.reg-tbl tbody tr:last-child{border-bottom:none}
-.reg-tbl tbody tr:hover{background:var(--paper2)}
-.reg-tbl tbody td{padding:6px 9px;vertical-align:top}
+.reg-tbl tbody tr:last-child td{border-bottom:none}
+.reg-tbl tbody tr:hover td{background:var(--paper2)}
+.reg-tbl tbody td{padding:6px 9px;vertical-align:top;border-bottom:1px solid var(--border);background:var(--paper)}
+
 .tr-new{animation:rfl 1.5s ease}.tr-saved{animation:rfl .8s ease}
 .cdate{white-space:nowrap;font-family:var(--ff-m);font-size:10px}
 .cwrap{min-width:90px;max-width:150px;white-space:normal;word-break:break-word}
@@ -1170,7 +1171,13 @@ function downloadAndProceed(){
 function updateProfBadge(){document.getElementById('pb-name').textContent=APP.profile.name||'Untitled';document.getElementById('pb-meta').textContent=APP.profile.fields.length+' fields \u00B7 '+(APP.profile.createdAt?new Date(APP.profile.createdAt).toLocaleDateString():'now');}
 function buildRegHeader(){
   const hr=document.getElementById('reg-hdr-row');if(!hr)return;
-  hr.innerHTML='<th style="width:52px"></th><th style="width:24px;text-align:center">#</th>'+APP.profile.fields.map(function(f){return'<th title="'+esc(f.sourceHint||f.path)+'">'+esc(f.label||f.path)+'</th>';}).join('')+'<th>Confidence</th>';
+  hr.innerHTML=
+    '<th style="width:52px"></th>'+
+    '<th style="width:24px;text-align:center">#</th>'+
+    APP.profile.fields.map(function(f){
+      return'<th title="'+esc(f.sourceHint||f.path)+'">'+esc(f.label||f.path)+'</th>';
+    }).join('')+
+    '<th>Confidence</th>';
 }
 function addExtFiles(ev){addToQ([...ev.target.files]);ev.target.value='';}
 function addToQ(files){files.filter(function(f){return f.type==='application/pdf';}).forEach(function(f){APP.extractQueue.push({id:'q'+Date.now()+Math.random().toString(36).slice(2,6),file:f,name:f.name,status:'pending'});});renderQ();syncBtn();}
@@ -1279,11 +1286,20 @@ function renderConf(c){
   return'<div><span class="cpill cp-'+cls+'" '+tip+'>'+(level||'?')+(pct!=null?' &middot; '+pct+'%':'')+'</span>'+(pct!=null?'<div class="cbw"><div class="cb cb-'+cls+'" style="width:'+pct+'%"></div></div>':'')+(c.notes?'<div style="font-size:10px;color:var(--ink3);margin-top:2px;max-width:120px">'+esc(c.notes)+'</div>':'')+'</div>';
 }
 function buildRegRow(num,data){
-  const cells=APP.profile.fields.map(function(f){return'<td>'+renderCell(resPath(data,f.path),f)+'</td>';}).join('');
+  const rid=data._rowId;
+  const cells=APP.profile.fields.map(function(f){
+    return'<td>'+renderCell(resPath(data,f.path),f)+'</td>';
+  }).join('');
   const hasPdf=!!(data._pdfObjectUrl||data._pdfDataUrl);
-  const editTitle=hasPdf?'Edit &amp; View Form':'Edit record';
-  return'<td><div class="racts"><button class="ra" onclick="openEdit(\''+data._rowId+'\')" title="'+editTitle+'">&#9998;'+(hasPdf?' <span style="font-size:9px" title="PDF stored">&#128196;</span>':'')+'</button><button class="ra del" onclick="delRec(\''+data._rowId+'\')" title="Delete">&#128465;</button></div></td>'+
-    '<td style="text-align:center;color:var(--ink3);font-family:var(--ff-m);font-size:11px">'+num+'</td>'+cells+'<td>'+renderConf(data._confidence)+'</td>';
+  const pdfBadge=hasPdf?'<span style="font-size:9px" title="PDF stored">&#128196;</span>':'';
+  const editTitle=hasPdf?'Edit & View Form':'Edit record';
+  return'<td><div class="racts">'+
+      '<button class="ra" onclick="openEdit(this)" data-rid="'+rid+'" title="'+editTitle+'">&#9998;'+pdfBadge+'</button>'+
+      '<button class="ra del" onclick="delRec(this)" data-rid="'+rid+'" title="Delete">&#128465;</button>'+
+    '</div></td>'+
+    '<td style="text-align:center;color:var(--ink3);font-family:var(--ff-m);font-size:11px">'+num+'</td>'+
+    cells+
+    '<td>'+renderConf(data._confidence)+'</td>';
 }
 function appendRow(data){
   const er=document.getElementById('empty-row');if(er)er.remove();
@@ -1293,7 +1309,8 @@ function appendRow(data){
   document.getElementById('rec-ct').textContent=APP.extractRecords.length+' record'+(APP.extractRecords.length!==1?'s':'');
   schedSave();
 }
-async function delRec(rid){
+async function delRec(elOrId){
+  const rid=typeof elOrId==='string'?elOrId:elOrId.dataset.rid;
   if(!await safeConfirm('Delete this record? This cannot be undone.'))return;
   APP.extractRecords=APP.extractRecords.filter(function(r){return r._rowId!==rid;});
   document.getElementById(rid)?.remove();
@@ -1390,7 +1407,8 @@ function reuploadPdf(event){
   toast('PDF loaded for preview','ok');
 }
 
-function openEdit(rid){
+function openEdit(elOrId){
+  const rid=typeof elOrId==='string'?elOrId:elOrId.dataset.rid;
   APP.editingId=rid;const data=APP.extractRecords.find(function(r){return r._rowId===rid;});if(!data)return;
   document.getElementById('edit-ttl').textContent='Edit Record \u00B7 '+(resPath(data,APP.profile.fields[0]?.path)||rid);
   // Render PDF pane
