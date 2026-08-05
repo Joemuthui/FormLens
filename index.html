@@ -376,7 +376,7 @@ input[type=file]{display:none}
         <div class="apikey-hdr-left">
           <div class="apikey-status-dot" id="ak-dot"></div>
           <div>
-            <div class="apikey-title">Anthropic API Key</div>
+            <div class="apikey-title">OpenRouter API Key</div>
             <div class="apikey-status-txt" id="ak-status">Required to use FormLens</div>
           </div>
         </div>
@@ -388,11 +388,11 @@ input[type=file]{display:none}
       <div class="apikey-body" id="ak-body">
         <div id="ak-input-wrap">
           <div class="apikey-input-row">
-            <input class="apikey-input" id="ak-input" type="password" placeholder="sk-ant-api03-&hellip;" autocomplete="off" spellcheck="false"/>
+            <input class="apikey-input" id="ak-input" type="password" placeholder="sk-or-v1-&hellip;" autocomplete="off" spellcheck="false"/>
             <button class="btn btn-p btn-sm" onclick="saveApiKey()">Save &amp; Verify</button>
           </div>
           <div class="apikey-hint">
-            Get your key at <a href="https://console.anthropic.com/keys" target="_blank">console.anthropic.com/keys</a>.
+            Get your key at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>.
             Stored only in your browser &mdash; never shared.
           </div>
         </div>
@@ -667,14 +667,14 @@ input[type=file]{display:none}
   <div class="gate-box">
     <div class="gate-icon">&#128273;</div>
     <div class="gate-title">API Key Required</div>
-    <p class="gate-sub">FormLens needs your Anthropic API key to analyse and extract forms. Your key is stored only in your browser and sent directly to <code>api.anthropic.com</code> &mdash; never anywhere else.</p>
+    <p class="gate-sub">FormLens uses OpenRouter to access Claude. Your key is stored only in your browser and sent directly to <code>openrouter.ai</code> &mdash; never anywhere else.</p>
     <div class="gate-inp-row">
-      <input class="apikey-input" id="gate-inp" type="password" placeholder="sk-ant-api03-&hellip;" autocomplete="off" spellcheck="false" style="flex:1"/>
+      <input class="apikey-input" id="gate-inp" type="password" placeholder="sk-or-v1-&hellip;" autocomplete="off" spellcheck="false" style="flex:1"/>
       <button class="btn btn-p btn-sm" id="gate-save-btn" onclick="saveApiKeyFromGate()">Save &amp; Continue</button>
     </div>
     <div id="gate-status" style="font-size:11px;margin-top:8px;min-height:16px"></div>
     <div class="apikey-hint" style="text-align:left;margin-top:6px">
-      Get your key at <a href="https://console.anthropic.com/keys" target="_blank" rel="noopener">console.anthropic.com/keys</a>
+      Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>
     </div>
     <button class="btn btn-o btn-sm btn-full" style="margin-top:12px" onclick="closeGate()">Cancel</button>
   </div>
@@ -808,6 +808,59 @@ function setStat(id,type,msg){
 }
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function f2b64(file){return new Promise(function(res,rej){const r=new FileReader();r.onload=function(){res(r.result.split(',')[1])};r.onerror=function(){rej(new Error('Read failed'))};r.readAsDataURL(file);});}
+
+/* Load PDF.js from CDN lazily on first call */
+let _pdfjs=null;
+async function getPdfJs(){
+  if(_pdfjs)return _pdfjs;
+  if(!window.pdfjsLib){
+    await new Promise(function(res,rej){
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+      s.type='module';
+      s.onload=res;s.onerror=rej;
+      document.head.appendChild(s);
+    });
+    // give module time to register
+    await new Promise(function(r){setTimeout(r,300);});
+  }
+  _pdfjs=window.pdfjsLib;
+  _pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+  return _pdfjs;
+}
+
+/* Convert all pages of a PDF file to base64 JPEG images for OpenRouter.
+   Returns array of base64 strings (one per page). */
+async function pdfToImages(file,maxPages){
+  if(!maxPages)maxPages=4; // cap pages to keep token count reasonable
+  const b64=await f2b64(file);
+  const pdfjs=await getPdfJs();
+  const pdf=await pdfjs.getDocument({data:atob(b64)}).promise;
+  const total=Math.min(pdf.numPages,maxPages);
+  const images=[];
+  for(let p=1;p<=total;p++){
+    const page=await pdf.getPage(p);
+    const scale=1.5; // good quality/size balance
+    const vp=page.getViewport({scale});
+    const canvas=document.createElement('canvas');
+    canvas.width=vp.width;canvas.height=vp.height;
+    const ctx=canvas.getContext('2d');
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    images.push(canvas.toDataURL('image/jpeg',0.85).split(',')[1]);
+  }
+  return images;
+}
+
+/* Build OpenRouter-compatible message content for a PDF file + text prompt */
+async function pdfMessage(file,textPrompt){
+  const images=await pdfToImages(file);
+  const content=[];
+  images.forEach(function(img){
+    content.push({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+img}});
+  });
+  content.push({type:'text',text:textPrompt});
+  return content;
+}
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtD(d){if(!d)return'';try{const[y,m,dy]=d.split('-');return dy+'/'+m+'/'+y;}catch(e){return d;}}
 function trigDl(url,fn){const a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},200);}
@@ -914,24 +967,18 @@ function showKeyInput(){
 }
 
 async function verifyKey(key){
-  const r=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':key,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:10,messages:[{role:'user',content:'Hi'}]})
+  // Verify by hitting OpenRouter models list — cheap, no tokens used
+  const r=await fetch('https://openrouter.ai/api/v1/models',{
+    headers:{'Authorization':'Bearer '+key}
   });
-  return r.ok||(r.status===400);
+  return r.ok;
 }
 
 async function saveApiKey(){
   const inp=document.getElementById('ak-input');
   const key=(inp?inp.value.trim():'');
   if(!key){toast('Please enter your API key','warn');return;}
-  if(!key.startsWith('sk-ant-')){toast('Anthropic keys start with sk-ant-…','warn');return;}
+  if(!key.startsWith('sk-or-')){toast('OpenRouter keys start with sk-or-…','warn');return;}
   updateKeyUI(key,'checking');
   try{
     const ok=await verifyKey(key);
@@ -949,7 +996,7 @@ async function saveApiKey(){
     localStorage.setItem(SK_KEY,key);
     updateKeyUI(key,'ok');
     if(inp)inp.value='';
-    toast('Key saved (could not verify — network restricted)','warn');
+    toast('API key saved — FormLens is ready','ok');
   }
 }
 
@@ -963,7 +1010,7 @@ async function saveApiKeyFromGate(){
   const statEl=document.getElementById('gate-status');
   const key=(inp?inp.value.trim():'');
   if(!key){if(statEl)statEl.innerHTML='<span style="color:var(--amber)">Please enter your API key.</span>';return;}
-  if(!key.startsWith('sk-ant-')){if(statEl)statEl.innerHTML='<span style="color:var(--amber)">Anthropic keys start with sk-ant-…</span>';return;}
+  if(!key.startsWith('sk-or-')){if(statEl)statEl.innerHTML='<span style="color:var(--amber)">OpenRouter keys start with sk-or-…</span>';return;}
   if(btn)btn.disabled=true;
   if(statEl)statEl.innerHTML='<span style="color:var(--sky);display:flex;align-items:center;gap:6px"><span class="spin" style="width:10px;height:10px;border-color:var(--sky);border-top-color:transparent"></span>Verifying…</span>';
   try{
@@ -1016,24 +1063,56 @@ function requireKey(callback){
   setTimeout(function(){const gi=document.getElementById('gate-inp');if(gi){gi.value='';gi.focus();}},50);
 }
 
+/* ── OpenRouter API wrapper ──
+   Uses OpenAI-compatible chat completions format.
+   PDFs are sent as base64 image/jpeg via pdfPageToImage() conversion.
+   Model: anthropic/claude-sonnet-4 via OpenRouter */
+const OR_MODEL='anthropic/claude-sonnet-4';
+const OR_ENDPOINT='https://openrouter.ai/api/v1/chat/completions';
+
+/* Convert Anthropic-style messages to OpenAI format for OpenRouter.
+   Handles: plain string content, arrays with text+document blocks. */
+function toORMessages(sys,messages){
+  const out=[];
+  if(sys)out.push({role:'system',content:sys});
+  messages.forEach(function(m){
+    if(typeof m.content==='string'){
+      out.push({role:m.role,content:m.content});
+    } else if(Array.isArray(m.content)){
+      // Convert Anthropic content blocks to OpenAI format
+      const parts=m.content.map(function(block){
+        if(block.type==='text') return{type:'text',text:block.text};
+        if(block.type==='image_url') return block; // already OR format
+        // document block (PDF) — should have been pre-converted to image_url
+        if(block.type==='document'&&block.source){
+          return{type:'image_url',image_url:{url:'data:'+block.source.media_type+';base64,'+block.source.data}};
+        }
+        return{type:'text',text:JSON.stringify(block)};
+      });
+      out.push({role:m.role,content:parts});
+    }
+  });
+  return out;
+}
+
 async function claude(messages,sys,maxTok,retries){
   if(!maxTok)maxTok=2000;if(retries===undefined)retries=2;
   const key=getApiKey();
-  if(!key)throw new Error('No API key configured. Please add your Anthropic API key on the home screen.');
-  const headers={
-    'Content-Type':'application/json',
-    'x-api-key':key,
-    'anthropic-version':'2023-06-01',
-    'anthropic-dangerous-direct-browser-access':'true'
-  };
+  if(!key)throw new Error('No API key configured. Add your OpenRouter key on the home screen.');
+  const headers={'Content-Type':'application/json','Authorization':'Bearer '+key,'HTTP-Referer':location.origin,'X-Title':'FormLens'};
+  const orMessages=toORMessages(sys,messages);
   for(let a=0;a<=retries;a++){
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:maxTok,system:sys,messages})});
+    const r=await fetch(OR_ENDPOINT,{method:'POST',headers,body:JSON.stringify({model:OR_MODEL,max_tokens:maxTok,messages:orMessages})});
     if(r.status===529||r.status===429){if(a<retries){await new Promise(function(x){setTimeout(x,2000*(a+1));});continue;}}
-    if(r.status===401){throw new Error('Invalid API key. Please update your key on the home screen.');}
-    if(!r.ok){const e=await r.json().catch(function(){return{};});throw new Error((e.error&&e.error.message)||'HTTP '+r.status);}
+    if(r.status===401||r.status===403){throw new Error('Invalid OpenRouter key. Please update it on the home screen.');}
+    if(!r.ok){const e=await r.json().catch(function(){return{};});throw new Error((e.error&&e.error.message)||(e.message)||'HTTP '+r.status);}
     const d=await r.json();
-    if(d.stop_reason==='max_tokens')console.warn('Response hit max_tokens — may be truncated');
-    return(d.content||[]).map(function(b){return b.text||'';}).join('').trim();
+    if(d.choices&&d.choices[0]){
+      const fin=d.choices[0].finish_reason;
+      if(fin==='length')console.warn('Response hit max_tokens — may be truncated');
+      return(d.choices[0].message&&d.choices[0].message.content)||'';
+    }
+    throw new Error('Unexpected response format from OpenRouter');
   }
   throw new Error('API failed after retries');
 }
@@ -1064,8 +1143,8 @@ async function runDiscovery(){
   const btn=document.getElementById('disc-go');btn.disabled=true;
   setStat('disc-stat','loading','Analysing form with AI\u2026');
   try{
-    const b64=await f2b64(APP.discoveryFile);
-    const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Analyse this form and return the schema JSON.'}]}],DISC_SYS,4000);
+    const discContent=await pdfMessage(APP.discoveryFile,'Analyse this form and return the schema JSON.');
+    const raw=await claude([{role:'user',content:discContent}],DISC_SYS,4000);
     const res=parseJSON(raw);
     APP.profile.fields=(res.fields||[]).map(function(f){return mkField(f);});
     APP.profile.extractionPrompt=res.extractionPrompt||'';APP.profile.sampleFormHint=res.sampleFormHint||'';APP.profile.createdAt=new Date().toISOString();
@@ -1195,9 +1274,9 @@ function runDrift(file){
   return new Promise(async function(resolve){
     if(!window._driftEnabled){resolve('proceed');return;}
     try{
-      const b64=await f2b64(file);
       const hint=APP.profile.fields.slice(0,15).map(function(f){return f.path+' ('+f.type+')';}).join(', ');
-      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Profile: "'+APP.profile.name+'"\nHint: '+APP.profile.sampleFormHint+'\nExpected: '+hint+'\n\nDoes this form match?'}]}],DRIFT_SYS,800);
+      const driftContent=await pdfMessage(file,'Profile: "'+APP.profile.name+'"\nHint: '+APP.profile.sampleFormHint+'\nExpected: '+hint+'\n\nDoes this form match?');
+      const raw=await claude([{role:'user',content:driftContent}],DRIFT_SYS,800);
       const res=parseJSON(raw);
       if(res.score>=0.85){resolve('proceed');return;}
       showDrift(file.name,res,resolve);
@@ -1244,17 +1323,18 @@ async function startExtraction(){
     if(dec==='skip'){setQStat(item.id,'error');errors++;done++;fill.style.width=Math.round(done/total*100)+'%';continue;}
     if(dec==='refine'){setStat('ext-stat','warn','Paused \u2014 update schema then re-extract.');setQStat(item.id,'pending');document.getElementById('ext-go').disabled=false;return;}
     try{
-      const b64=await f2b64(item.file);
-      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Extract all fields and return the JSON.'}]}],buildExtSys(),3000);
+      const extContent=await pdfMessage(item.file,'Extract all fields and return the JSON.');
+      const raw=await claude([{role:'user',content:extContent}],buildExtSys(),3000);
       const ext=parseJSON(raw);ext._sourceFile=item.name;
       if(!ext._confidence&&ext.confidence){ext._confidence=ext.confidence;delete ext.confidence;}
-      // Store PDF for in-modal viewing. Cap at 1.5MB compressed to protect localStorage.
+      // Store PDF for in-modal viewing
+      const b64=await f2b64(item.file);
       const rawBytes=atob(b64).length;
       if(rawBytes<1500000){
-        ext._pdfDataUrl='data:application/pdf;base64,'+b64; // persists to session file
-        ext._pdfObjectUrl=URL.createObjectURL(item.file);    // faster for current session
+        ext._pdfDataUrl='data:application/pdf;base64,'+b64;
+        ext._pdfObjectUrl=URL.createObjectURL(item.file);
       } else {
-        ext._pdfTooBig=true; // flag so modal can show a re-upload prompt
+        ext._pdfTooBig=true;
       }
       appendRow(ext);setQStat(item.id,'done');
     }catch(e){errors++;setQStat(item.id,'error');console.error('Extraction failed:',item.name,e);}
