@@ -1016,33 +1016,80 @@ function requireKey(callback){
    Uses OpenAI-compatible chat completions format.
    PDFs are sent as base64 image/jpeg via pdfPageToImage() conversion.
    Model: anthropic/claude-sonnet-4 via OpenRouter */
-/* ── OpenRouter via Anthropic-skin endpoint ──
-   OpenRouter exposes an Anthropic-compatible endpoint that accepts the
-   native Anthropic Messages API format including document blocks for PDFs.
-   No PDF-to-image conversion needed — PDFs sent as base64 document blocks. */
+/* ── OpenRouter — CORS-enabled browser endpoint ──
+   Uses api/v1/chat/completions (OpenAI-compatible, CORS enabled).
+   PDFs sent as OpenRouter file content type (base64 data URL).
+   System prompt sent as first message with role:system. */
 const OR_MODEL    = 'anthropic/claude-sonnet-4';
-const OR_ENDPOINT = 'https://openrouter.ai/api/anthropic/v1/messages';
+const OR_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
-async function claude(messages,sys,maxTok,retries){
-  if(!maxTok)maxTok=2000;if(retries===undefined)retries=2;
-  const key=getApiKey();
-  if(!key)throw new Error('No API key configured. Add your OpenRouter key on the home screen.');
-  const headers={
-    'Content-Type':'application/json',
-    'Authorization':'Bearer '+key,
-    'anthropic-version':'2023-06-01',
-    'HTTP-Referer':location.origin,
-    'X-Title':'FormLens'
+/* Build OpenRouter messages array from Anthropic-style input.
+   Converts document blocks to OpenRouter file content type. */
+function toORMessages(sys, messages){
+  const out = [];
+  if(sys) out.push({role:'system', content: sys});
+  messages.forEach(function(m){
+    if(typeof m.content === 'string'){
+      out.push({role: m.role, content: m.content});
+      return;
+    }
+    if(Array.isArray(m.content)){
+      const parts = m.content.map(function(block){
+        if(block.type === 'text'){
+          return {type:'text', text: block.text};
+        }
+        if(block.type === 'document' && block.source){
+          // OpenRouter universal PDF format
+          return {
+            type: 'file',
+            file: {
+              filename: 'form.pdf',
+              file_data: 'data:' + block.source.media_type + ';base64,' + block.source.data
+            }
+          };
+        }
+        return {type:'text', text: JSON.stringify(block)};
+      });
+      out.push({role: m.role, content: parts});
+    }
+  });
+  return out;
+}
+
+async function claude(messages, sys, maxTok, retries){
+  if(!maxTok) maxTok = 2000;
+  if(retries === undefined) retries = 2;
+  const key = getApiKey();
+  if(!key) throw new Error('No API key configured. Add your OpenRouter key on the home screen.');
+  const headers = {
+    'Content-Type':  'application/json',
+    'Authorization': 'Bearer ' + key,
+    'HTTP-Referer':  location.origin,
+    'X-Title':       'FormLens'
   };
-  for(let a=0;a<=retries;a++){
-    const r=await fetch(OR_ENDPOINT,{method:'POST',headers,
-      body:JSON.stringify({model:OR_MODEL,max_tokens:maxTok,system:sys,messages})});
-    if(r.status===529||r.status===429){if(a<retries){await new Promise(function(x){setTimeout(x,2000*(a+1));});continue;}}
-    if(r.status===401||r.status===403){throw new Error('Invalid OpenRouter key. Please update it on the home screen.');}
-    if(!r.ok){const e=await r.json().catch(function(){return{};});throw new Error((e.error&&e.error.message)||(e.message)||'HTTP '+r.status);}
-    const d=await r.json();
-    if(d.stop_reason==='max_tokens')console.warn('Response hit max_tokens — may be truncated');
-    return(d.content||[]).map(function(b){return b.text||'';}).join('').trim();
+  const orMessages = toORMessages(sys, messages);
+  for(let a = 0; a <= retries; a++){
+    const r = await fetch(OR_ENDPOINT, {
+      method: 'POST', headers,
+      body: JSON.stringify({model: OR_MODEL, max_tokens: maxTok, messages: orMessages})
+    });
+    if(r.status === 529 || r.status === 429){
+      if(a < retries){ await new Promise(function(x){setTimeout(x, 2000*(a+1));}); continue; }
+    }
+    if(r.status === 401 || r.status === 403){
+      throw new Error('Invalid OpenRouter key. Please update it on the home screen.');
+    }
+    if(!r.ok){
+      const e = await r.json().catch(function(){return{};});
+      throw new Error((e.error && e.error.message) || e.message || 'HTTP ' + r.status);
+    }
+    const d = await r.json();
+    if(d.choices && d.choices[0]){
+      if(d.choices[0].finish_reason === 'length')
+        console.warn('Response hit max_tokens — may be truncated');
+      return (d.choices[0].message && d.choices[0].message.content) || '';
+    }
+    throw new Error('Unexpected response from OpenRouter');
   }
   throw new Error('API failed after retries');
 }
