@@ -809,58 +809,7 @@ function setStat(id,type,msg){
 function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function f2b64(file){return new Promise(function(res,rej){const r=new FileReader();r.onload=function(){res(r.result.split(',')[1])};r.onerror=function(){rej(new Error('Read failed'))};r.readAsDataURL(file);});}
 
-/* Load PDF.js from CDN lazily on first call */
-let _pdfjs=null;
-async function getPdfJs(){
-  if(_pdfjs)return _pdfjs;
-  if(!window.pdfjsLib){
-    await new Promise(function(res,rej){
-      const s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
-      s.type='module';
-      s.onload=res;s.onerror=rej;
-      document.head.appendChild(s);
-    });
-    // give module time to register
-    await new Promise(function(r){setTimeout(r,300);});
-  }
-  _pdfjs=window.pdfjsLib;
-  _pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-  return _pdfjs;
-}
-
-/* Convert all pages of a PDF file to base64 JPEG images for OpenRouter.
-   Returns array of base64 strings (one per page). */
-async function pdfToImages(file,maxPages){
-  if(!maxPages)maxPages=4; // cap pages to keep token count reasonable
-  const b64=await f2b64(file);
-  const pdfjs=await getPdfJs();
-  const pdf=await pdfjs.getDocument({data:atob(b64)}).promise;
-  const total=Math.min(pdf.numPages,maxPages);
-  const images=[];
-  for(let p=1;p<=total;p++){
-    const page=await pdf.getPage(p);
-    const scale=1.5; // good quality/size balance
-    const vp=page.getViewport({scale});
-    const canvas=document.createElement('canvas');
-    canvas.width=vp.width;canvas.height=vp.height;
-    const ctx=canvas.getContext('2d');
-    await page.render({canvasContext:ctx,viewport:vp}).promise;
-    images.push(canvas.toDataURL('image/jpeg',0.85).split(',')[1]);
-  }
-  return images;
-}
-
-/* Build OpenRouter-compatible message content for a PDF file + text prompt */
-async function pdfMessage(file,textPrompt){
-  const images=await pdfToImages(file);
-  const content=[];
-  images.forEach(function(img){
-    content.push({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+img}});
-  });
-  content.push({type:'text',text:textPrompt});
-  return content;
-}
+/* PDF sent as native document block — no PDF.js needed */
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtD(d){if(!d)return'';try{const[y,m,dy]=d.split('-');return dy+'/'+m+'/'+y;}catch(e){return d;}}
 function trigDl(url,fn){const a=document.createElement('a');a.href=url;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},200);}
@@ -1067,52 +1016,33 @@ function requireKey(callback){
    Uses OpenAI-compatible chat completions format.
    PDFs are sent as base64 image/jpeg via pdfPageToImage() conversion.
    Model: anthropic/claude-sonnet-4 via OpenRouter */
-const OR_MODEL='anthropic/claude-sonnet-4';
-const OR_ENDPOINT='https://openrouter.ai/api/v1/chat/completions';
-
-/* Convert Anthropic-style messages to OpenAI format for OpenRouter.
-   Handles: plain string content, arrays with text+document blocks. */
-function toORMessages(sys,messages){
-  const out=[];
-  if(sys)out.push({role:'system',content:sys});
-  messages.forEach(function(m){
-    if(typeof m.content==='string'){
-      out.push({role:m.role,content:m.content});
-    } else if(Array.isArray(m.content)){
-      // Convert Anthropic content blocks to OpenAI format
-      const parts=m.content.map(function(block){
-        if(block.type==='text') return{type:'text',text:block.text};
-        if(block.type==='image_url') return block; // already OR format
-        // document block (PDF) — should have been pre-converted to image_url
-        if(block.type==='document'&&block.source){
-          return{type:'image_url',image_url:{url:'data:'+block.source.media_type+';base64,'+block.source.data}};
-        }
-        return{type:'text',text:JSON.stringify(block)};
-      });
-      out.push({role:m.role,content:parts});
-    }
-  });
-  return out;
-}
+/* ── OpenRouter via Anthropic-skin endpoint ──
+   OpenRouter exposes an Anthropic-compatible endpoint that accepts the
+   native Anthropic Messages API format including document blocks for PDFs.
+   No PDF-to-image conversion needed — PDFs sent as base64 document blocks. */
+const OR_MODEL    = 'anthropic/claude-sonnet-4';
+const OR_ENDPOINT = 'https://openrouter.ai/api/anthropic/v1/messages';
 
 async function claude(messages,sys,maxTok,retries){
   if(!maxTok)maxTok=2000;if(retries===undefined)retries=2;
   const key=getApiKey();
   if(!key)throw new Error('No API key configured. Add your OpenRouter key on the home screen.');
-  const headers={'Content-Type':'application/json','Authorization':'Bearer '+key,'HTTP-Referer':location.origin,'X-Title':'FormLens'};
-  const orMessages=toORMessages(sys,messages);
+  const headers={
+    'Content-Type':'application/json',
+    'Authorization':'Bearer '+key,
+    'anthropic-version':'2023-06-01',
+    'HTTP-Referer':location.origin,
+    'X-Title':'FormLens'
+  };
   for(let a=0;a<=retries;a++){
-    const r=await fetch(OR_ENDPOINT,{method:'POST',headers,body:JSON.stringify({model:OR_MODEL,max_tokens:maxTok,messages:orMessages})});
+    const r=await fetch(OR_ENDPOINT,{method:'POST',headers,
+      body:JSON.stringify({model:OR_MODEL,max_tokens:maxTok,system:sys,messages})});
     if(r.status===529||r.status===429){if(a<retries){await new Promise(function(x){setTimeout(x,2000*(a+1));});continue;}}
     if(r.status===401||r.status===403){throw new Error('Invalid OpenRouter key. Please update it on the home screen.');}
     if(!r.ok){const e=await r.json().catch(function(){return{};});throw new Error((e.error&&e.error.message)||(e.message)||'HTTP '+r.status);}
     const d=await r.json();
-    if(d.choices&&d.choices[0]){
-      const fin=d.choices[0].finish_reason;
-      if(fin==='length')console.warn('Response hit max_tokens — may be truncated');
-      return(d.choices[0].message&&d.choices[0].message.content)||'';
-    }
-    throw new Error('Unexpected response format from OpenRouter');
+    if(d.stop_reason==='max_tokens')console.warn('Response hit max_tokens — may be truncated');
+    return(d.content||[]).map(function(b){return b.text||'';}).join('').trim();
   }
   throw new Error('API failed after retries');
 }
@@ -1143,8 +1073,8 @@ async function runDiscovery(){
   const btn=document.getElementById('disc-go');btn.disabled=true;
   setStat('disc-stat','loading','Analysing form with AI\u2026');
   try{
-    const discContent=await pdfMessage(APP.discoveryFile,'Analyse this form and return the schema JSON.');
-    const raw=await claude([{role:'user',content:discContent}],DISC_SYS,4000);
+    const discB64=await f2b64(APP.discoveryFile);
+    const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:discB64}},{type:'text',text:'Analyse this form and return the schema JSON.'}]}],DISC_SYS,2000);
     const res=parseJSON(raw);
     APP.profile.fields=(res.fields||[]).map(function(f){return mkField(f);});
     APP.profile.extractionPrompt=res.extractionPrompt||'';APP.profile.sampleFormHint=res.sampleFormHint||'';APP.profile.createdAt=new Date().toISOString();
@@ -1211,7 +1141,7 @@ async function runRefinement(){
   try{
     const cf=APP.profile.fields.map(function(f){return{id:f.id,path:f.path,label:f.label,type:f.type,allowedValues:f.allowedValues,required:f.required,sourceHint:f.sourceHint};});
     const cp=document.getElementById('ext-prompt').value;
-    const raw=await claude([{role:'user',content:'Current fields:\n'+JSON.stringify(cf,null,2)+'\n\nCurrent prompt:\n'+cp+'\n\nFeedback: '+fb}],REF_SYS,4000);
+    const raw=await claude([{role:'user',content:'Current fields:\n'+JSON.stringify(cf,null,2)+'\n\nCurrent prompt:\n'+cp+'\n\nFeedback: '+fb}],REF_SYS,1500);
     document.getElementById(tid)?.remove();
     const res=parseJSON(raw);
     const oi={};APP.profile.fields.forEach(function(f){oi[f.id]=f;});
@@ -1275,8 +1205,8 @@ function runDrift(file){
     if(!window._driftEnabled){resolve('proceed');return;}
     try{
       const hint=APP.profile.fields.slice(0,15).map(function(f){return f.path+' ('+f.type+')';}).join(', ');
-      const driftContent=await pdfMessage(file,'Profile: "'+APP.profile.name+'"\nHint: '+APP.profile.sampleFormHint+'\nExpected: '+hint+'\n\nDoes this form match?');
-      const raw=await claude([{role:'user',content:driftContent}],DRIFT_SYS,800);
+      const driftB64=await f2b64(file);
+      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:driftB64}},{type:'text',text:'Profile: "'+APP.profile.name+'"\nHint: '+APP.profile.sampleFormHint+'\nExpected: '+hint+'\n\nDoes this form match?'}]}],DRIFT_SYS,300);
       const res=parseJSON(raw);
       if(res.score>=0.85){resolve('proceed');return;}
       showDrift(file.name,res,resolve);
@@ -1323,8 +1253,8 @@ async function startExtraction(){
     if(dec==='skip'){setQStat(item.id,'error');errors++;done++;fill.style.width=Math.round(done/total*100)+'%';continue;}
     if(dec==='refine'){setStat('ext-stat','warn','Paused \u2014 update schema then re-extract.');setQStat(item.id,'pending');document.getElementById('ext-go').disabled=false;return;}
     try{
-      const extContent=await pdfMessage(item.file,'Extract all fields and return the JSON.');
-      const raw=await claude([{role:'user',content:extContent}],buildExtSys(),3000);
+      const extB64=await f2b64(item.file);
+      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:extB64}},{type:'text',text:'Extract all fields and return the JSON.'}]}],buildExtSys(),1500);
       const ext=parseJSON(raw);ext._sourceFile=item.name;
       if(!ext._confidence&&ext.confidence){ext._confidence=ext.confidence;delete ext.confidence;}
       // Store PDF for in-modal viewing
