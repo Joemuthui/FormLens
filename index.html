@@ -1236,7 +1236,23 @@ function buildRegHeader(){
     '<th>Confidence</th>';
 }
 function addExtFiles(ev){addToQ([...ev.target.files]);ev.target.value='';}
-function addToQ(files){files.filter(function(f){return f.type==='application/pdf';}).forEach(function(f){APP.extractQueue.push({id:'q'+Date.now()+Math.random().toString(36).slice(2,6),file:f,name:f.name,status:'pending'});});renderQ();syncBtn();}
+function addToQ(files){
+  const rejected=[];
+  files.forEach(function(f){
+    if(f.type==='application/pdf'){
+      APP.extractQueue.push({id:'q'+Date.now()+Math.random().toString(36).slice(2,6),file:f,name:f.name,status:'pending'});
+    } else {
+      rejected.push(f.name);
+    }
+  });
+  if(rejected.length){
+    const names=rejected.join(', ');
+    const hint=rejected.some(function(n){return n.endsWith('.docx')||n.endsWith('.doc');})?
+      ' Word documents can be saved as PDF via File → Save As → PDF.':'';
+    toast('PDF only: '+names+'.'+hint,'warn',5000);
+  }
+  renderQ();syncBtn();
+}
 function syncBtn(){document.getElementById('ext-go').disabled=!APP.extractQueue.some(function(q){return q.status==='pending';});}
 function renderQ(){
   const any=APP.extractQueue.length>0;document.getElementById('q-sec').style.display=any?'block':'none';document.getElementById('q-ct').textContent=APP.extractQueue.length;
@@ -1532,6 +1548,18 @@ function exportCSV(){
 }
 // ── INIT ──
 window.goLanding=goLanding;window.resumeSession=resumeSession;window.saveSessionFile=saveSessionFile;
+
+/* Warn before page refresh/close if there are extracted records.
+   Note: browsers control the exact message shown — we can't customise it.
+   The event just needs a returnValue set to trigger the native dialog. */
+window.addEventListener('beforeunload',function(e){
+  if(APP.extractRecords&&APP.extractRecords.length>0){
+    const msg='You have '+APP.extractRecords.length+' extracted record'+(APP.extractRecords.length!==1?'s':'')+' in this session. If you leave, unsaved changes may be lost. Use “Save Session” to keep your work.';
+    e.preventDefault();
+    e.returnValue=msg; // required for Chrome
+    return msg;        // required for Firefox/Safari
+  }
+});
 window._driftEnabled=true;
 function toggleDrift(){
   window._driftEnabled=!window._driftEnabled;
@@ -1554,7 +1582,16 @@ document.addEventListener('DOMContentLoaded',function(){
   document.getElementById('prof-name')?.addEventListener('input',function(e){const el=document.getElementById('prof-fn-prev');if(el)el.textContent=slug(e.target.value||'my-profile')+'.formprofile.json';});
   document.getElementById('fb-inp')?.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();runRefinement();}});
   var dz=document.getElementById('disc-dz');
-  if(dz){dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag');});dz.addEventListener('dragleave',function(){dz.classList.remove('drag');});dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag');var f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')applyDiscFile(f);});}
+  if(dz){dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag');});dz.addEventListener('dragleave',function(){dz.classList.remove('drag');});dz.addEventListener('drop',function(e){
+  e.preventDefault();dz.classList.remove('drag');
+  var f=e.dataTransfer.files[0];
+  if(!f)return;
+  if(f.type==='application/pdf'){applyDiscFile(f);}
+  else{
+    var hint=(f.name.endsWith('.docx')||f.name.endsWith('.doc'))?' In Word: File → Save As → PDF.':'';
+    toast('PDF files only.'+hint,'warn',5000);
+  }
+});}
   var edz=document.getElementById('ext-dz');
   if(edz){edz.addEventListener('dragover',function(e){e.preventDefault();edz.style.background='var(--pine-pale)';edz.style.borderColor='var(--pine)';});edz.addEventListener('dragleave',function(){edz.style.background='';edz.style.borderColor='';});edz.addEventListener('drop',function(e){e.preventDefault();edz.style.background='';edz.style.borderColor='';addToQ([...e.dataTransfer.files].filter(function(f){return f.type==='application/pdf';}));});}
   // Breadcrumb navigation
