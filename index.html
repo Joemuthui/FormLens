@@ -1111,7 +1111,7 @@ function loadProfile(p){
   updateProfBadge();buildRegHeader();updateSessBox();setStorInd('saved','profile loaded');goExtract();
 }
 // ── DISCOVERY ──
-const DISC_SYS='You are a form schema analyst. Analyse the uploaded PDF and return ONLY raw JSON:\n{"sampleFormHint":"one sentence","fields":[{"path":"dot.key","label":"Human Label","type":"text|date|time|integer|decimal|boolean|enum|list","allowedValues":"comma-sep for enum; format hint for date; else empty","required":true,"sourceHint":"where on the form","notes":"any ambiguity"}],"extractionPrompt":"Concise instructions max 400 words: layout, checkboxes, dates, skip-logic, field-type rules.","confidence":0.92,"confidenceNotes":"brief note"}\nRules: dot.notation for nesting. enum: list all options in allowedValues. Return ONLY raw JSON.';
+const DISC_SYS='You are a form schema analyst. Analyse the uploaded PDF and return ONLY raw JSON:\n{"sampleFormHint":"one sentence","fields":[{"path":"dot.key","label":"Human Label","type":"text|date|time|integer|decimal|boolean|enum|list","allowedValues":"comma-sep for enum; format hint for date; else empty","required":true,"sourceHint":"where on the form","notes":"any ambiguity"}],"extractionPrompt":"Concise instructions max 250 words: layout, checkboxes, dates, skip-logic, field-type rules.","confidence":0.92,"confidenceNotes":"brief note"}\nRules: dot.notation for nesting. enum: list all options in allowedValues. Return ONLY raw JSON.';
 function setDiscFile(ev){const f=ev.target.files[0];if(f)applyDiscFile(f);ev.target.value='';}
 function applyDiscFile(f){APP.discoveryFile=f;document.getElementById('disc-fname').textContent=f.name;document.getElementById('disc-pill').style.display='block';document.getElementById('disc-go').disabled=false;setStat('disc-stat','idle','Ready: '+f.name);}
 async function runDiscovery(){
@@ -1121,7 +1121,7 @@ async function runDiscovery(){
   setStat('disc-stat','loading','Analysing form with AI\u2026');
   try{
     const discB64=await f2b64(APP.discoveryFile);
-    const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:discB64}},{type:'text',text:'Analyse this form and return the schema JSON.'}]}],DISC_SYS,2000);
+    const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:discB64}},{type:'text',text:'Analyse this form and return the schema JSON.'}]}],DISC_SYS,4000);
     const res=parseJSON(raw);
     APP.profile.fields=(res.fields||[]).map(function(f){return mkField(f);});
     APP.profile.extractionPrompt=res.extractionPrompt||'';APP.profile.sampleFormHint=res.sampleFormHint||'';APP.profile.createdAt=new Date().toISOString();
@@ -1188,7 +1188,7 @@ async function runRefinement(){
   try{
     const cf=APP.profile.fields.map(function(f){return{id:f.id,path:f.path,label:f.label,type:f.type,allowedValues:f.allowedValues,required:f.required,sourceHint:f.sourceHint};});
     const cp=document.getElementById('ext-prompt').value;
-    const raw=await claude([{role:'user',content:'Current fields:\n'+JSON.stringify(cf,null,2)+'\n\nCurrent prompt:\n'+cp+'\n\nFeedback: '+fb}],REF_SYS,1500);
+    const raw=await claude([{role:'user',content:'Current fields:\n'+JSON.stringify(cf,null,2)+'\n\nCurrent prompt:\n'+cp+'\n\nFeedback: '+fb}],REF_SYS,2000);
     document.getElementById(tid)?.remove();
     const res=parseJSON(raw);
     const oi={};APP.profile.fields.forEach(function(f){oi[f.id]=f;});
@@ -1317,7 +1317,7 @@ async function startExtraction(){
     if(dec==='refine'){setStat('ext-stat','warn','Paused \u2014 update schema then re-extract.');setQStat(item.id,'pending');document.getElementById('ext-go').disabled=false;return;}
     try{
       const extB64=await f2b64(item.file);
-      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:extB64}},{type:'text',text:'Extract all fields and return the JSON.'}]}],buildExtSys(),1500);
+      const raw=await claude([{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:extB64}},{type:'text',text:'Extract all fields and return the JSON.'}]}],buildExtSys(),3000);
       const ext=parseJSON(raw);ext._sourceFile=item.name;
       if(!ext._confidence&&ext.confidence){ext._confidence=ext.confidence;delete ext.confidence;}
       // Store PDF for in-modal viewing
