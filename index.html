@@ -1015,12 +1015,12 @@ function requireKey(callback){
 /* ── OpenRouter API wrapper ──
    Uses OpenAI-compatible chat completions format.
    PDFs are sent as base64 image/jpeg via pdfPageToImage() conversion.
-   Model: anthropic/claude-sonnet-4 via OpenRouter */
+   Model:z-ai/glm-5.2 via OpenRouter */
 /* ── OpenRouter — CORS-enabled browser endpoint ──
    Uses api/v1/chat/completions (OpenAI-compatible, CORS enabled).
    PDFs sent as OpenRouter file content type (base64 data URL).
    System prompt sent as first message with role:system. */
-const OR_MODEL    = 'anthropic/claude-sonnet-4';
+const OR_MODEL    = 'z-ai/glm-5.2';
 const OR_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
 /* Build OpenRouter messages array from Anthropic-style input.
