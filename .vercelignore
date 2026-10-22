@@ -1,0 +1,5 @@
+# Files kept in the repo but not published on the site
+tools/
+tests/
+docs/
+README.md
